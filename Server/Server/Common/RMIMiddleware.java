@@ -1,4 +1,4 @@
-package Server.RMI;
+package Server.Common;
 
 import Server.Interface.*;
 import Client.Client;
@@ -10,11 +10,10 @@ import java.util.*;
 import java.rmi.RemoteException;
 import java.rmi.NotBoundException;
 
-public class RMIMiddleware implements IResourceManager {
+public class RMIMiddleware extends ResourceManager {
 
     private static String s_serverName = "RMIMiddleware";
     private static String s_rmiPrefix = "group14";
-    // protected RMHashMap m_data = new RMHashMap();
 
     private static String s_flightHost = "localhost";
     private static int s_flightPort = 1099;
@@ -28,21 +27,15 @@ public class RMIMiddleware implements IResourceManager {
     private static int s_roomPort = 1099;
     private static String s_roomName = "Room";
 
-    private static String s_customerHost = "localhost";
-    private static int s_customerPort = 1099;
-    private static String s_customerName = "Customer";
-
-    private IResourceManager flightRM = null;
-    private IResourceManager carRM = null;
-    private IResourceManager roomRM = null;
-    private IResourceManager customerRM = null;
-    private String m_name;
+    private ResourceManager flightRM = null;
+    private ResourceManager carRM = null;
+    private ResourceManager roomRM = null;
 
     public static void main(String[] args)
     {
         // RMIMiddleware server name
-        // Given all 8 arguments or all use default values.
-        if (args.length == 9 || args.length == 1 || args.length == 0)
+        // Given all 6 server arguments or all use default values.
+        if (args.length == 7 || args.length == 1 || args.length == 0)
         {
             if (args.length > 0){
                 s_serverName = args[0];
@@ -55,8 +48,8 @@ public class RMIMiddleware implements IResourceManager {
                 s_carName = args[4];
                 s_roomHost = args[5];
                 s_roomName = args[6];
-                s_customerHost = args[7];
-                s_customerName = args[8];
+//                s_customerHost = args[7];
+//                s_customerName = args[8];
             }
         }
         else
@@ -71,14 +64,13 @@ public class RMIMiddleware implements IResourceManager {
             System.setSecurityManager(new SecurityManager());
         }
 
-        // Crate a new Server entry and get 4 rmiRegistry.
+        // Crate a new Server entry and get 3 rmiRegistry.
         try {
             RMIMiddleware middle = new RMIMiddleware("RMIMiddleware");
             try {
                 middle.connectServer("flight", s_flightHost, s_flightPort, s_flightName);
                 middle.connectServer("car", s_carHost, s_carPort, s_carName);
                 middle.connectServer("room", s_roomHost, s_roomPort, s_roomName);
-                middle.connectServer("customer", s_customerHost, s_customerPort, s_customerName);
             } catch (Exception e) {
                 System.err.println((char) 27 + "[31;1mClient exception: " + (char) 27 + "[0mUncaught exception");
                 e.printStackTrace();
@@ -122,9 +114,9 @@ public class RMIMiddleware implements IResourceManager {
         }
     }
 
-    public RMIMiddleware(String p_name)
+    public RMIMiddleware(String name)
     {
-        s_serverName = p_name;
+        super(name);
     }
 
     public void connectServer(String tp, String server, int port, String name)
@@ -135,14 +127,12 @@ public class RMIMiddleware implements IResourceManager {
             {
                 try {
                     Registry registry = LocateRegistry.getRegistry(server, port);
-                    if (tp == "flight") {
-                        flightRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
-                    } else if (tp == "car") {
-                        carRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
-                    } else if (tp == "room") {
-                        roomRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
-                    } else if (tp == "customer") {
-                        customerRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
+                    if (tp.equals("flight")) {
+                        flightRM = (ResourceManager) registry.lookup(s_rmiPrefix + name);
+                    } else if (tp.equals("car")) {
+                        carRM = (ResourceManager) registry.lookup(s_rmiPrefix + name);
+                    } else if (tp.equals("room")) {
+                        roomRM = (ResourceManager) registry.lookup(s_rmiPrefix + name);
                     } else {
                         System.err.println((char)27 + "[Please specify four ResourceManagers, or use default values.");
                         System.exit(1);
@@ -164,6 +154,81 @@ public class RMIMiddleware implements IResourceManager {
             System.err.println((char)27 + "[31;1mServer exception: " + (char)27 + "[0mUncaught exception");
             e.printStackTrace();
             System.exit(1);
+        }
+    }
+
+    // Reserve an item
+    protected boolean reserveItem(int xid, int customerID, String key, String location, ResourceManager rm)
+    {
+        Trace.info("RM::reserveItem(" + xid + ", customer=" + customerID + ", " + key + ", " + location + ") called" );
+        // Read customer object if it exists (and read lock it)
+        Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
+        if (customer == null)
+        {
+            Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ")  failed--customer doesn't exist");
+            return false;
+        }
+
+        // Check if the item is available
+        ReservableItem item = (ReservableItem)rm.readData(xid, key);
+        if (item == null)
+        {
+            Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") failed--item doesn't exist");
+            return false;
+        }
+        else if (item.getCount() == 0)
+        {
+            Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") failed--No more items");
+            return false;
+        }
+        else
+        {
+            customer.reserve(key, location, item.getPrice());
+            writeData(xid, customer.getKey(), customer);
+
+            // Decrease the number of available items in the storage
+            item.setCount(item.getCount() - 1);
+            item.setReserved(item.getReserved() + 1);
+            rm.writeData(xid, item.getKey(), item);
+
+            Trace.info("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") succeeded");
+            return true;
+        }
+    }
+
+    public boolean deleteCustomer(int xid, int customerID) throws RemoteException
+    {
+        Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") called");
+        Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
+        if (customer == null)
+        {
+            Trace.warn("RM::deleteCustomer(" + xid + ", " + customerID + ") failed--customer doesn't exist");
+            return false;
+        }
+        else
+        {
+            // Increase the reserved numbers of all reservable items which the customer reserved.
+            RMHashMap reservations = customer.getReservations();
+            ResourceManager[] v = {flightRM, carRM, roomRM};
+            for (String reservedKey : reservations.keySet())
+            {
+                ReservedItem reserveditem = customer.getReservedItem(reservedKey);
+                Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey() + " " + reserveditem.getCount() +  " times");
+                for (ResourceManager rm : v) {
+                    ReservableItem item = (ReservableItem) rm.readData(xid, reserveditem.getKey());
+                    if (item == null) continue;
+                    Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey() + " which is reserved " + item.getReserved() + " times and is still available " + item.getCount() + " times");
+                    item.setReserved(item.getReserved() - reserveditem.getCount());
+                    item.setCount(item.getCount() + reserveditem.getCount());
+                    rm.writeData(xid, item.getKey(), item);
+                    break;
+                }
+            }
+
+            // Remove the customer from the storage
+            removeData(xid, customer.getKey());
+            Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") succeeded");
+            return true;
         }
     }
 
@@ -229,40 +294,17 @@ public class RMIMiddleware implements IResourceManager {
 
     public boolean reserveFlight(int xid, int customerID, int flightNum) throws RemoteException
     {
-        return flightRM.reserveFlight(xid, customerID, flightNum);
+        return reserveItem(xid, customerID, Flight.getKey(flightNum), String.valueOf(flightNum), flightRM);
     }
 
     public boolean reserveCar(int xid, int customerID, String location) throws RemoteException
     {
-        return carRM.reserveCar(xid, customerID, location);
+        return reserveItem(xid, customerID, Car.getKey(location), location, carRM);
     }
 
     public boolean reserveRoom(int xid, int customerID, String location) throws RemoteException
     {
-        return roomRM.reserveRoom(xid, customerID, location);
-    }
-
-    /**
-     * Customer-related functions
-     */
-    public String queryCustomerInfo(int xid, int customerID) throws RemoteException
-    {
-        return customerRM.queryCustomerInfo(xid, customerID);
-    }
-
-    public int newCustomer(int xid) throws RemoteException
-    {
-        return customerRM.newCustomer(xid);
-    }
-
-    public boolean newCustomer(int xid, int customerID) throws RemoteException
-    {
-        return customerRM.newCustomer(xid, customerID);
-    }
-
-    public boolean deleteCustomer(int xid, int customerID) throws RemoteException
-    {
-        return customerRM.deleteCustomer(xid, customerID);
+        return reserveItem(xid, customerID, Room.getKey(location), location, roomRM);
     }
 
     public boolean bundle(int xid, int customerID, Vector<String> flightNum, String location, boolean car, boolean room) throws RemoteException
@@ -282,12 +324,12 @@ public class RMIMiddleware implements IResourceManager {
         }
         if (yn_car && yn_room && yn_flight)
         {
-            boolean ret1 = carRM.reserveCar(xid, customerID, location);
-            boolean ret2 = roomRM.reserveRoom(xid, customerID, location);
+            boolean ret1 = reserveCar(xid, customerID, location);
+            boolean ret2 = reserveRoom(xid, customerID, location);
             boolean ret3 = true;
             for (Integer i: flightNum_int)
             {
-                ret3 = flightRM.reserveFlight(xid, customerID, i);
+                ret3 = reserveFlight(xid, customerID, i);
                 if (!ret3)
                     break;
             }
