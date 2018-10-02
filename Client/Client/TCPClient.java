@@ -106,7 +106,6 @@ public class TCPClient extends Client {
                 System.out.println("-Flight Seats: " + arguments.elementAt(3));
                 System.out.println("-Flight Price: " + arguments.elementAt(4));
 
-                arguments.setElementAt("add flight", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Flight added");
                 } else {
@@ -122,7 +121,6 @@ public class TCPClient extends Client {
                 System.out.println("-Number of Cars: " + arguments.elementAt(3));
                 System.out.println("-Car Price: " + arguments.elementAt(4));
 
-                arguments.setElementAt("add car", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Cars added");
                 } else {
@@ -142,7 +140,6 @@ public class TCPClient extends Client {
                 String location = arguments.elementAt(2);
                 int numRooms = toInt(arguments.elementAt(3));
                 int price = toInt(arguments.elementAt(4));*/
-                arguments.setElementAt("add room", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Rooms added");
                 } else {
@@ -156,7 +153,6 @@ public class TCPClient extends Client {
                 System.out.println("Adding a new customer [xid=" + arguments.elementAt(1) + "]");
 
 /*                int id = toInt(arguments.elementAt(1));*/
-                arguments.setElementAt("add customer", 0);
                 int customer = send_msg_int(arguments);
                 System.out.println("Add customer ID: " + customer);
                 break;
@@ -170,7 +166,6 @@ public class TCPClient extends Client {
                 int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
 
-                arguments.setElementAt("add customer id", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Add customer ID: " + customerID);
                 } else {
@@ -186,7 +181,6 @@ public class TCPClient extends Client {
 
 /*                int id = toInt(arguments.elementAt(1));
                 int flightNum = toInt(arguments.elementAt(2));*/
-                arguments.setElementAt("delete flight", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Flight Deleted");
                 } else {
@@ -250,7 +244,6 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 int flightNum = toInt(arguments.elementAt(2));
-                arguments.setElementAt("query flight", 0);
                 int seats = send_msg_int(arguments);
                 System.out.println("Number of seats available: " + seats);
                 break;
@@ -263,7 +256,6 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);
-                arguments.setElementAt("query cars", 0);
                 int numCars = send_msg_int(arguments);
                 System.out.println("Number of cars at this location: " + numCars);
                 break;
@@ -276,7 +268,6 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);
-                arguments.setElementAt("query room", 0);
                 int numRoom = send_msg_int(arguments);
                 System.out.println("Number of rooms at this location: " + numRoom);
                 break;
@@ -289,7 +280,6 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
-                arguments.setElementAt("query customer", 0);
                 String bill = send_msg(arguments);
                 System.out.print(bill);
                 break;
@@ -302,7 +292,6 @@ public class TCPClient extends Client {
 
                 /*int id = toInt(arguments.elementAt(1));
                 int flightNum = toInt(arguments.elementAt(2));*/
-                arguments.setElementAt("query flight price", 0);
                 int price = send_msg_int(arguments);
                 System.out.println("Price of a seat: " + price);
                 break;
@@ -315,7 +304,6 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);
-                arguments.setElementAt("query car price", 0);
                 int price = send_msg_int(arguments);
                 System.out.println("Price of cars at this location: " + price);
                 break;
@@ -328,7 +316,6 @@ public class TCPClient extends Client {
 
 /*                int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);*/
-                arguments.setElementAt("query room price", 0);
                 int price = send_msg_int(arguments);
                 System.out.println("Price of rooms at this location: " + price);
                 break;
@@ -343,7 +330,6 @@ public class TCPClient extends Client {
                 /*int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
                 int flightNum = toInt(arguments.elementAt(3));*/
-                arguments.setElementAt("reserve flight", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Flight Reserved");
                 } else {
@@ -361,7 +347,6 @@ public class TCPClient extends Client {
                 /*int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
                 String location = arguments.elementAt(3);*/
-                arguments.setElementAt("reserve car", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Car Reserved");
                 } else {
@@ -379,7 +364,6 @@ public class TCPClient extends Client {
                 /*int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
                 String location = arguments.elementAt(3);*/
-                arguments.setElementAt("reserve room", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Room Reserved");
                 } else {
@@ -412,7 +396,6 @@ public class TCPClient extends Client {
                 String location = arguments.elementAt(arguments.size()-3);
                 boolean car = toBoolean(arguments.elementAt(arguments.size()-2));
                 boolean room = toBoolean(arguments.elementAt(arguments.size()-1));*/
-                arguments.setElementAt("bundle", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Bundle Reserved");
                 } else {

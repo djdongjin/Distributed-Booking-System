@@ -1,4 +1,4 @@
-package Server.Common;
+package Server.RMI;
 
 import Server.Interface.*;
 import Client.Client;
@@ -9,11 +9,10 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.rmi.RemoteException;
 import java.rmi.NotBoundException;
-import java.io.*;
 
-public class Middleware implements IResourceManager {
+public class RMIMiddleware implements IResourceManager {
 
-    private static String s_serverName = "Middleware";
+    private static String s_serverName = "RMIMiddleware";
     private static String s_rmiPrefix = "group14";
     // protected RMHashMap m_data = new RMHashMap();
 
@@ -41,7 +40,7 @@ public class Middleware implements IResourceManager {
 
     public static void main(String[] args)
     {
-        // Middleware server name
+        // RMIMiddleware server name
         // Given all 8 arguments or all use default values.
         if (args.length == 9 || args.length == 1 || args.length == 0)
         {
@@ -74,7 +73,7 @@ public class Middleware implements IResourceManager {
 
         // Crate a new Server entry and get 4 rmiRegistry.
         try {
-            Middleware middle = new Middleware("Middleware");
+            RMIMiddleware middle = new RMIMiddleware("RMIMiddleware");
             try {
                 middle.connectServer("flight", s_flightHost, s_flightPort, s_flightName);
                 middle.connectServer("car", s_carHost, s_carPort, s_carName);
@@ -123,7 +122,7 @@ public class Middleware implements IResourceManager {
         }
     }
 
-    public Middleware(String p_name)
+    public RMIMiddleware(String p_name)
     {
         s_serverName = p_name;
     }
