@@ -106,11 +106,6 @@ public class TCPClient extends Client {
                 System.out.println("-Flight Seats: " + arguments.elementAt(3));
                 System.out.println("-Flight Price: " + arguments.elementAt(4));
 
-/*                int id = toInt(arguments.elementAt(1));
-                int flightNum = toInt(arguments.elementAt(2));
-                int flightSeats = toInt(arguments.elementAt(3));
-                int flightPrice = toInt(arguments.elementAt(4));*/
-
                 arguments.setElementAt("add flight", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Flight added");
@@ -127,10 +122,6 @@ public class TCPClient extends Client {
                 System.out.println("-Number of Cars: " + arguments.elementAt(3));
                 System.out.println("-Car Price: " + arguments.elementAt(4));
 
-/*                int id = toInt(arguments.elementAt(1));
-                String location = arguments.elementAt(2);
-                int numCars = toInt(arguments.elementAt(3));
-                int price = toInt(arguments.elementAt(4));*/
                 arguments.setElementAt("add car", 0);
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Cars added");

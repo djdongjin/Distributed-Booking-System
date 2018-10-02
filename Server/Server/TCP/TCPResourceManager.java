@@ -12,15 +12,15 @@ public class TCPResourceManager extends ResourceManager {
     private static String s_serverName = "Server";
     private static int s_serverPort = 9999;
 
-    private int port;
+    private int listenPort;
 
     TCPResourceManager(String name, int port)
     {
         super(name);
-        this.port = port;
+        this.listenPort = port;
     }
 
-    public static void main()
+    public static void main(String[] args)
     {
         if (args.length > 0)
             s_serverName = args[0];
@@ -28,19 +28,19 @@ public class TCPResourceManager extends ResourceManager {
             s_serverPort = Integer.parseInt(args[1]);
 
         TCPResourceManager tcp_ResourceManager = new TCPResourceManager(s_serverName, s_serverPort);
-        tcp_ResourceManager.acceptConnections();
+        tcp_ResourceManager.acceptConnection();
     }
 
-    public void acceptConnections()
+    public void acceptConnection()
     {
         try
         {
-            ServerSocket server = new ServerSocket(port, 10);
+            ServerSocket server = new ServerSocket(listenPort, 10);
             Socket client_request = null;
             while (true)
             {
                 client_request = server.accept();
-                (new Thread(new RequestHandler(client_request))).start();
+                (new Thread(new RequestHandler(this, client_request))).start();
             }
         }
         catch (BindException e) {
