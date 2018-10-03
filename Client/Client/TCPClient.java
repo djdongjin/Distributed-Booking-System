@@ -9,7 +9,7 @@ public class TCPClient extends Client {
     private String serverHost = "localhost";
     private int serverPort = 8888;
 
-    // private Socket sock = null;
+    private Socket clientSocket = null;
     private BufferedReader reader = null;
     private ObjectOutputStream writer = null;
 
@@ -47,22 +47,34 @@ public class TCPClient extends Client {
             System.exit(1);
         }
     }
-
+    // Connect to Middleware and obtain socket, IO stream.
     public void connectServer()
     {
-        try
-        {
-            Socket client = new Socket(serverHost, serverPort);
-            reader = new BufferedReader(new InputStreamReader(client.getInputStream()));
-            writer = new ObjectOutputStream(client.getOutputStream());
+        try {
+            boolean first = true;
+            while (true) {
+                try {
+                    clientSocket = new Socket(serverHost, serverPort);
+                    reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    writer = new ObjectOutputStream(clientSocket.getOutputStream());
+                    System.out.println("Connected to '" + "' server [" + serverHost + ":" + serverPort +"]");
+                    break;
+                }
+                catch(UnknownHostException e) {
+                    System.err.println((char)27 + "[31;1mServer exception: " + (char)27 + "[UnknownHost exception");
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+                catch(IOException e) {
+                    System.err.println((char)27 + "[31;1mIO exception: " + (char)27 + "[IO exception");
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+                Thread.sleep(500);
+            }
         }
-        catch(UnknownHostException e) {
-            System.err.println((char)27 + "[31;1mServer exception: " + (char)27 + "[UnknownHost exception");
-            e.printStackTrace();
-            System.exit(1);
-        }
-        catch(IOException e) {
-            System.err.println((char)27 + "[31;1mIO exception: " + (char)27 + "[IO exception");
+        catch (Exception e) {
+            System.err.println((char)27 + "[31;1mServer exception: " + (char)27 + "[0mUncaught exception");
             e.printStackTrace();
             System.exit(1);
         }
@@ -74,6 +86,7 @@ public class TCPClient extends Client {
         {
             reader.close();
             writer.close();
+            clientSocket.close();
         }
         catch(IOException e) {
             System.err.println((char)27 + "[31;1mIO exception: " + (char)27 + "[IO exception");
@@ -136,10 +149,11 @@ public class TCPClient extends Client {
                 System.out.println("-Number of Rooms: " + arguments.elementAt(3));
                 System.out.println("-Room Price: " + arguments.elementAt(4));
 
-/*                int id = toInt(arguments.elementAt(1));
+                int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);
                 int numRooms = toInt(arguments.elementAt(3));
-                int price = toInt(arguments.elementAt(4));*/
+                int price = toInt(arguments.elementAt(4));
+
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Rooms added");
                 } else {
@@ -152,7 +166,8 @@ public class TCPClient extends Client {
 
                 System.out.println("Adding a new customer [xid=" + arguments.elementAt(1) + "]");
 
-/*                int id = toInt(arguments.elementAt(1));*/
+                int id = toInt(arguments.elementAt(1));
+
                 int customer = send_msg_int(arguments);
                 System.out.println("Add customer ID: " + customer);
                 break;
@@ -179,8 +194,9 @@ public class TCPClient extends Client {
                 System.out.println("Deleting a flight [xid=" + arguments.elementAt(1) + "]");
                 System.out.println("-Flight Number: " + arguments.elementAt(2));
 
-/*                int id = toInt(arguments.elementAt(1));
-                int flightNum = toInt(arguments.elementAt(2));*/
+                int id = toInt(arguments.elementAt(1));
+                int flightNum = toInt(arguments.elementAt(2));
+
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Flight Deleted");
                 } else {
@@ -194,8 +210,8 @@ public class TCPClient extends Client {
                 System.out.println("Deleting all cars at a particular location [xid=" + arguments.elementAt(1) + "]");
                 System.out.println("-Car Location: " + arguments.elementAt(2));
 
-/*                int id = toInt(arguments.elementAt(1));
-                String location = arguments.elementAt(2);*/
+                int id = toInt(arguments.elementAt(1));
+                String location = arguments.elementAt(2);
 
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Cars Deleted");
@@ -210,8 +226,8 @@ public class TCPClient extends Client {
                 System.out.println("Deleting all rooms at a particular location [xid=" + arguments.elementAt(1) + "]");
                 System.out.println("-Car Location: " + arguments.elementAt(2));
 
-/*                int id = toInt(arguments.elementAt(1));
-                String location = arguments.elementAt(2);*/
+                int id = toInt(arguments.elementAt(1));
+                String location = arguments.elementAt(2);
 
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Rooms Deleted");
@@ -226,8 +242,8 @@ public class TCPClient extends Client {
                 System.out.println("Deleting a customer from the database [xid=" + arguments.elementAt(1) + "]");
                 System.out.println("-Customer ID: " + arguments.elementAt(2));
 
-/*                int id = toInt(arguments.elementAt(1));
-                int customerID = toInt(arguments.elementAt(2));*/
+                int id = toInt(arguments.elementAt(1));
+                int customerID = toInt(arguments.elementAt(2));
 
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Customer Deleted");
@@ -244,6 +260,7 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 int flightNum = toInt(arguments.elementAt(2));
+
                 int seats = send_msg_int(arguments);
                 System.out.println("Number of seats available: " + seats);
                 break;
@@ -256,6 +273,7 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);
+
                 int numCars = send_msg_int(arguments);
                 System.out.println("Number of cars at this location: " + numCars);
                 break;
@@ -268,6 +286,7 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);
+
                 int numRoom = send_msg_int(arguments);
                 System.out.println("Number of rooms at this location: " + numRoom);
                 break;
@@ -280,6 +299,7 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
+
                 String bill = send_msg(arguments);
                 System.out.print(bill);
                 break;
@@ -290,8 +310,9 @@ public class TCPClient extends Client {
                 System.out.println("Querying a flight price [xid=" + arguments.elementAt(1) + "]");
                 System.out.println("-Flight Number: " + arguments.elementAt(2));
 
-                /*int id = toInt(arguments.elementAt(1));
-                int flightNum = toInt(arguments.elementAt(2));*/
+                int id = toInt(arguments.elementAt(1));
+                int flightNum = toInt(arguments.elementAt(2));
+
                 int price = send_msg_int(arguments);
                 System.out.println("Price of a seat: " + price);
                 break;
@@ -304,6 +325,7 @@ public class TCPClient extends Client {
 
                 int id = toInt(arguments.elementAt(1));
                 String location = arguments.elementAt(2);
+
                 int price = send_msg_int(arguments);
                 System.out.println("Price of cars at this location: " + price);
                 break;
@@ -314,8 +336,9 @@ public class TCPClient extends Client {
                 System.out.println("Querying rooms price [xid=" + arguments.elementAt(1) + "]");
                 System.out.println("-Room Location: " + arguments.elementAt(2));
 
-/*                int id = toInt(arguments.elementAt(1));
-                String location = arguments.elementAt(2);*/
+                int id = toInt(arguments.elementAt(1));
+                String location = arguments.elementAt(2);
+
                 int price = send_msg_int(arguments);
                 System.out.println("Price of rooms at this location: " + price);
                 break;
@@ -327,9 +350,10 @@ public class TCPClient extends Client {
                 System.out.println("-Customer ID: " + arguments.elementAt(2));
                 System.out.println("-Flight Number: " + arguments.elementAt(3));
 
-                /*int id = toInt(arguments.elementAt(1));
+                int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
-                int flightNum = toInt(arguments.elementAt(3));*/
+                int flightNum = toInt(arguments.elementAt(3));
+
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Flight Reserved");
                 } else {
@@ -344,9 +368,10 @@ public class TCPClient extends Client {
                 System.out.println("-Customer ID: " + arguments.elementAt(2));
                 System.out.println("-Car Location: " + arguments.elementAt(3));
 
-                /*int id = toInt(arguments.elementAt(1));
+                int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
-                String location = arguments.elementAt(3);*/
+                String location = arguments.elementAt(3);
+
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Car Reserved");
                 } else {
@@ -361,9 +386,10 @@ public class TCPClient extends Client {
                 System.out.println("-Customer ID: " + arguments.elementAt(2));
                 System.out.println("-Room Location: " + arguments.elementAt(3));
 
-                /*int id = toInt(arguments.elementAt(1));
+                int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
-                String location = arguments.elementAt(3);*/
+                String location = arguments.elementAt(3);
+
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Room Reserved");
                 } else {
@@ -386,12 +412,33 @@ public class TCPClient extends Client {
                 System.out.println("-Car Location: " + arguments.elementAt(arguments.size()-2));
                 System.out.println("-Room Location: " + arguments.elementAt(arguments.size()-1));
 
+
+                int id = toInt(arguments.elementAt(1));
+                int customerID = toInt(arguments.elementAt(2));
+                Vector<String> flightNumbers = new Vector<String>();
+                for (int i = 0; i < arguments.size() - 6; ++i) {
+                    flightNumbers.addElement(arguments.elementAt(3+i));
+                }
+                String location = arguments.elementAt(arguments.size()-3);
+                boolean car = toBoolean(arguments.elementAt(arguments.size()-2));
+                boolean room = toBoolean(arguments.elementAt(arguments.size()-1));
+
                 if (send_msg_boolean(arguments)) {
                     System.out.println("Bundle Reserved");
                 } else {
                     System.out.println("Bundle could not be reserved");
                 }
                 break;
+            }
+            case Analytics: {
+                String item = arguments.elementAt(1).equals("Flight") ? "Seat(s)" : arguments.elementAt(1) + "(s)";
+
+                String[] results = send_msg(arguments).split(";");
+                System.out.println("-----------------");
+                for (String res : results) {
+                    String[] param = res.split(",");
+                    System.out.println("There are(is) " + param[1] + item + " left in " + param[0] + " with price " + param[2]);
+                }
             }
             case Quit:
                 checkArgumentsCount(1, arguments.size());
@@ -404,7 +451,7 @@ public class TCPClient extends Client {
     private boolean send_msg_boolean(Vector<String> arguments)
     {
         String ret = send_msg(arguments);
-        return ret.equals("1");
+        return ret.equals("true");
     }
 
     private int send_msg_int(Vector<String> arguments)
