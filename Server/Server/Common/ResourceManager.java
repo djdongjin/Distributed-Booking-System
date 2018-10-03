@@ -49,6 +49,15 @@ public class ResourceManager implements IResourceManager
 		}
 	}
 
+	protected void modifyData(int xid, String key, boolean plus, int num)
+	{
+		ReservableItem item = (ReservableItem)readData(xid, key);
+		if (!plus)
+			num = - num;
+		item.setCount(item.getCount() + num);
+		item.setReserved(item.getReserved() - num);
+	}
+
 	// Deletes the encar item
 	protected boolean deleteItem(int xid, String key)
 	{
