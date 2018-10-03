@@ -13,11 +13,11 @@ public class TCPClient extends Client {
     private BufferedReader reader = null;
     private ObjectOutputStream writer = null;
 
-    public TCPClient(String serverHost, int serverePort)
+    public TCPClient(String serverHost, int serverPort)
     {
         super();
         this.serverHost = serverHost;
-        this.serverPort = serverePort;
+        this.serverPort = serverPort;
     }
 
     public static void main(String[] args)
