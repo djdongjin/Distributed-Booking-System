@@ -1,7 +1,6 @@
 package Server.Common;
 
 import Server.Interface.*;
-import Client.Client;
 
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -316,7 +315,7 @@ public class RMIMiddleware extends ResourceManager {
         Vector<Integer> flightNum_int = new Vector<>();
         for (String num: flightNum)
         {
-            int num_int = Client.toInt(num);
+            int num_int = Integer.parseInt(num);
             flightNum_int.add(num_int);
             yn_flight = flightRM.queryFlight(xid, num_int) > 0;
             if (!yn_flight)
