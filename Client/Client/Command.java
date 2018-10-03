@@ -13,6 +13,7 @@ public enum Command {
 	DeleteCars("Delete all cars at a location", "<xid>,<Location>"),
 	DeleteRooms("Delete all rooms at a location", "<xid>,<Location>"),
 	DeleteCustomer("Delete a customer (and return all reservations)", "<xid>,<CustomerID>"),
+	DeleteReservation("Delete a reserved item when deleting a customer", "<xid>,<CustomerID>,<Key>,<ReservedCount>"),
 
 	QueryFlight("Query the number of available seats on a flight number", "<xid>,<FlightNumber>"),
 	QueryCars("Query the number of available cars at a location", "<xid>,<Location>"),

@@ -2,15 +2,12 @@ package Server.TCP;
 
 import Server.Common.*;
 import Server.Interface.*;
-import Client.Client;
 import Client.Command;
 
 import java.io.*;
 import java.net.*;
 import java.rmi.RemoteException;
 import java.util.Vector;
-
-import static Client.Client.toInt;
 
 public class TCPResourceManager extends ResourceManager {
 
@@ -33,14 +30,15 @@ public class TCPResourceManager extends ResourceManager {
             s_serverPort = Integer.parseInt(args[1]);
 
         TCPResourceManager tcp_ResourceManager = new TCPResourceManager(s_serverName, s_serverPort);
-        tcp_ResourceManager.acceptConnection();
+        while (true)
+            tcp_ResourceManager.acceptConnection();
     }
 
     public void acceptConnection()
     {
         try
         {
-            ServerSocket server = new ServerSocket(listenPort, 10);
+            ServerSocket server = new ServerSocket(listenPort);
             Socket client_request = null;
             while (true)
             {
@@ -49,11 +47,27 @@ public class TCPResourceManager extends ResourceManager {
             }
         }
         catch (BindException e) {
-            // TODO
+            System.err.println((char)27 + "[31;1mServer exception: " + (char)27 + "[0mUncaught exception");
+            e.printStackTrace();
         }
         catch (IOException e) {
-            // TODO
+            System.err.println((char)27 + "[31;1mIO exception: " + (char)27 + "[0mUncaught IOStream");
+            e.printStackTrace();
         }
+    }
+
+    // Delete the reservation when deleting a customer
+    public boolean deleteReservation(int xid, int customerID, String reservedKey, int reservedCount)
+            throws RemoteException {
+        ReservableItem item = (ReservableItem) readData(xid, reservedKey);
+        Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reservedKey
+                + " which is reserved " + item.getReserved() + " times and is still available " + item.getCount()
+                + " times");
+        item.setReserved(item.getReserved() - reservedCount);
+        item.setCount(item.getCount() + reservedCount);
+        writeData(xid, item.getKey(), item);
+
+        return true;
     }
 
 
@@ -69,10 +83,12 @@ public class TCPResourceManager extends ResourceManager {
 
         public void run()
         {
+            BufferedWriter writer = null;
+            ObjectInputStream reader = null;
             try
             {
-                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(client_request.getOutputStream()));
-                ObjectInputStream reader = new ObjectInputStream(client_request.getInputStream());
+                writer = new BufferedWriter(new OutputStreamWriter(client_request.getOutputStream()));
+                reader = new ObjectInputStream(client_request.getInputStream());
 
                 Vector<String> arguments = (Vector<String>)reader.readObject();
 
@@ -80,13 +96,16 @@ public class TCPResourceManager extends ResourceManager {
                 String ret = execute(cmd, arguments);
 
                 // TODO: return value from RM to Middle to client
-                //
+                writer.write(ret);
+                writer.flush();
             }
             catch (IOException e) {
-                // TODO
+                System.err.println((char)27 + "[31;1mIO exception: " + (char)27 + "[0mUncaught IOStream");
+                e.printStackTrace();
             }
             catch (ClassNotFoundException e) {
-                // TODO
+                System.err.println((char)27 + "[31;1mClassNotFound exception: " + (char)27 + "[0mUncaught ClassNotFound exception");
+                e.printStackTrace();
             }
         }
 
@@ -96,10 +115,10 @@ public class TCPResourceManager extends ResourceManager {
                 String ret = "false";
                 switch (cmd) {
                     case AddFlight: {
-                        int id = toInt(arguments.elementAt(1));
-                        int flightNum = toInt(arguments.elementAt(2));
-                        int flightSeats = toInt(arguments.elementAt(3));
-                        int flightPrice = toInt(arguments.elementAt(4));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int flightNum = Integer.parseInt(arguments.elementAt(2));
+                        int flightSeats = Integer.parseInt(arguments.elementAt(3));
+                        int flightPrice = Integer.parseInt(arguments.elementAt(4));
 
                         boolean yn = addFlight(id, flightNum, flightSeats, flightPrice);
                         ret = Boolean.toString(yn);
@@ -107,10 +126,10 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case AddCars: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
-                        int numCars = toInt(arguments.elementAt(3));
-                        int price = toInt(arguments.elementAt(4));
+                        int numCars = Integer.parseInt(arguments.elementAt(3));
+                        int price = Integer.parseInt(arguments.elementAt(4));
 
                         boolean yn = addCars(id, location, numCars, price);
                         ret = Boolean.toString(yn);
@@ -118,10 +137,10 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case AddRooms: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
-                        int numRooms = toInt(arguments.elementAt(3));
-                        int price = toInt(arguments.elementAt(4));
+                        int numRooms = Integer.parseInt(arguments.elementAt(3));
+                        int price = Integer.parseInt(arguments.elementAt(4));
 
                         if (addRooms(id, location, numRooms, price)) {
                             System.out.println("Rooms added");
@@ -130,27 +149,10 @@ public class TCPResourceManager extends ResourceManager {
                         }
                         break;
                     }
-                    case AddCustomer: {
-
-                        int id = toInt(arguments.elementAt(1));
-                        int customer = newCustomer(id);
-
-                        ret = Integer.toString(customer);
-                        break;
-                    }
-                    case AddCustomerID: {
-
-                        int id = toInt(arguments.elementAt(1));
-                        int customerID = toInt(arguments.elementAt(2));
-
-                        boolean yn = newCustomer(id, customerID);
-                        ret = Boolean.toString(yn);
-                        break;
-                    }
                     case DeleteFlight: {
 
-                        int id = toInt(arguments.elementAt(1));
-                        int flightNum = toInt(arguments.elementAt(2));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int flightNum = Integer.parseInt(arguments.elementAt(2));
 
                         boolean yn = deleteFlight(id, flightNum);
                         ret = Boolean.toString(yn);
@@ -158,7 +160,7 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case DeleteCars: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
                         boolean yn = deleteCars(id, location);
@@ -167,26 +169,26 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case DeleteRooms: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
                         boolean yn = deleteRooms(id, location);
                         ret = Boolean.toString(yn);
                         break;
                     }
-                    case DeleteCustomer: {
+                    /*case DeleteCustomer: {
 
-                        int id = toInt(arguments.elementAt(1));
-                        int customerID = toInt(arguments.elementAt(2));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
 
                         boolean yn = deleteCustomer(id, customerID);
                         ret = Boolean.toString(yn);
                         break;
-                    }
+                    }*/
                     case QueryFlight: {
 
-                        int id = toInt(arguments.elementAt(1));
-                        int flightNum = toInt(arguments.elementAt(2));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int flightNum = Integer.parseInt(arguments.elementAt(2));
 
                         int seats = queryFlight(id, flightNum);
                         ret = Integer.toString(seats);
@@ -194,7 +196,7 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case QueryCars: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
                         int numCars = queryCars(id, location);
@@ -203,25 +205,17 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case QueryRooms: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
                         int numRoom = queryRooms(id, location);
                         ret = Integer.toString(numRoom);
                         break;
                     }
-                    case QueryCustomer: {
-
-                        int id = toInt(arguments.elementAt(1));
-                        int customerID = toInt(arguments.elementAt(2));
-
-                        ret = queryCustomerInfo(id, customerID);
-                        break;
-                    }
                     case QueryFlightPrice: {
 
-                        int id = toInt(arguments.elementAt(1));
-                        int flightNum = toInt(arguments.elementAt(2));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int flightNum = Integer.parseInt(arguments.elementAt(2));
 
                         int price = queryFlightPrice(id, flightNum);
                         ret = Integer.toString(price);
@@ -229,7 +223,7 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case QueryCarsPrice: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
                         int price = queryCarsPrice(id, location);
@@ -238,7 +232,7 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case QueryRoomsPrice: {
 
-                        int id = toInt(arguments.elementAt(1));
+                        int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
                         int price = queryRoomsPrice(id, location);
@@ -247,9 +241,9 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case ReserveFlight: {
 
-                        int id = toInt(arguments.elementAt(1));
-                        int customerID = toInt(arguments.elementAt(2));
-                        int flightNum = toInt(arguments.elementAt(3));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+                        int flightNum = Integer.parseInt(arguments.elementAt(3));
 
                         ret = Boolean.toString(reserveFlight(id, customerID, flightNum));
                         System.out.println("Flight Reserved");
@@ -257,8 +251,8 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case ReserveCar: {
 
-                        int id = toInt(arguments.elementAt(1));
-                        int customerID = toInt(arguments.elementAt(2));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
                         String location = arguments.elementAt(3);
 
                         ret = Boolean.toString(reserveCar(id, customerID, location));
@@ -266,12 +260,22 @@ public class TCPResourceManager extends ResourceManager {
                     }
                     case ReserveRoom: {
 
-                        int id = toInt(arguments.elementAt(1));
-                        int customerID = toInt(arguments.elementAt(2));
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
                         String location = arguments.elementAt(3);
 
                         ret = Boolean.toString(reserveRoom(id, customerID, location));
                         System.out.println("Room Reserved");
+                        break;
+                    }
+                    case DeleteReservation: {
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+                        String reservedKey = arguments.elementAt(3);
+                        int reservedCount = Integer.parseInt(arguments.elementAt(4));
+
+                        boolean yn = deleteReservation(id, customerID, reservedKey, reservedCount);
+                        ret = Boolean.toString(yn);
                         break;
                     }
                 }
