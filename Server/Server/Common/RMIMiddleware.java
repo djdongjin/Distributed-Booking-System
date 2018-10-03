@@ -26,9 +26,9 @@ public class RMIMiddleware extends ResourceManager {
     private static int s_roomPort = 1099;
     private static String s_roomName = "Room";
 
-    private ResourceManager flightRM = null;
-    private ResourceManager carRM = null;
-    private ResourceManager roomRM = null;
+    private IResourceManager flightRM = null;
+    private IResourceManager carRM = null;
+    private IResourceManager roomRM = null;
 
     public static void main(String[] args)
     {
@@ -39,7 +39,7 @@ public class RMIMiddleware extends ResourceManager {
             if (args.length > 0){
                 s_serverName = args[0];
             }
-            if (args.length == 9)
+            if (args.length == 7)
             {
                 s_flightHost = args[1];
                 s_flightName = args[2];
@@ -47,8 +47,6 @@ public class RMIMiddleware extends ResourceManager {
                 s_carName = args[4];
                 s_roomHost = args[5];
                 s_roomName = args[6];
-//                s_customerHost = args[7];
-//                s_customerName = args[8];
             }
         }
         else
@@ -106,11 +104,7 @@ public class RMIMiddleware extends ResourceManager {
             e.printStackTrace();
             System.exit(1);
         }
-        // Create and install a security manager
-        if (System.getSecurityManager() == null)
-        {
-            System.setSecurityManager(new SecurityManager());
-        }
+
     }
 
     public RMIMiddleware(String name)
@@ -127,11 +121,11 @@ public class RMIMiddleware extends ResourceManager {
                 try {
                     Registry registry = LocateRegistry.getRegistry(server, port);
                     if (tp.equals("flight")) {
-                        flightRM = (ResourceManager) registry.lookup(s_rmiPrefix + name);
+                        flightRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
                     } else if (tp.equals("car")) {
-                        carRM = (ResourceManager) registry.lookup(s_rmiPrefix + name);
+                        carRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
                     } else if (tp.equals("room")) {
-                        roomRM = (ResourceManager) registry.lookup(s_rmiPrefix + name);
+                        roomRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
                     } else {
                         System.err.println((char)27 + "[Please specify four ResourceManagers, or use default values.");
                         System.exit(1);
@@ -157,7 +151,7 @@ public class RMIMiddleware extends ResourceManager {
     }
 
     // Reserve an item
-    protected boolean reserveItem(int xid, int customerID, String key, String location, ResourceManager rm)
+    protected boolean reserveItem(int xid, int customerID, String key, String location, IResourceManager rm) throws RemoteException
     {
         Trace.info("RM::reserveItem(" + xid + ", customer=" + customerID + ", " + key + ", " + location + ") called" );
         // Read customer object if it exists (and read lock it)
@@ -169,26 +163,21 @@ public class RMIMiddleware extends ResourceManager {
         }
 
         // Check if the item is available
-        ReservableItem item = (ReservableItem)rm.readData(xid, key);
-        if (item == null)
-        {
-            Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") failed--item doesn't exist");
-            return false;
-        }
-        else if (item.getCount() == 0)
+        int price = rm.modify(xid, key, -1);
+        if (price == -1)
         {
             Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") failed--No more items");
             return false;
         }
+        else if (price == 0)
+        {
+            Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") item doesn't exist");
+            return false;
+        }
         else
         {
-            customer.reserve(key, location, item.getPrice());
+            customer.reserve(key, location, price);
             writeData(xid, customer.getKey(), customer);
-
-            // Decrease the number of available items in the storage
-            item.setCount(item.getCount() - 1);
-            item.setReserved(item.getReserved() + 1);
-            rm.writeData(xid, item.getKey(), item);
 
             Trace.info("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") succeeded");
             return true;
@@ -208,18 +197,15 @@ public class RMIMiddleware extends ResourceManager {
         {
             // Increase the reserved numbers of all reservable items which the customer reserved.
             RMHashMap reservations = customer.getReservations();
-            ResourceManager[] v = {flightRM, carRM, roomRM};
+            IResourceManager[] v = {flightRM, carRM, roomRM};
             for (String reservedKey : reservations.keySet())
             {
                 ReservedItem reserveditem = customer.getReservedItem(reservedKey);
                 Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey() + " " + reserveditem.getCount() +  " times");
-                for (ResourceManager rm : v) {
-                    ReservableItem item = (ReservableItem) rm.readData(xid, reserveditem.getKey());
-                    if (item == null) continue;
-                    Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey() + " which is reserved " + item.getReserved() + " times and is still available " + item.getCount() + " times");
-                    item.setReserved(item.getReserved() - reserveditem.getCount());
-                    item.setCount(item.getCount() + reserveditem.getCount());
-                    rm.writeData(xid, item.getKey(), item);
+                for (IResourceManager rm : v) {
+                    int price = rm.modify(xid, reserveditem.getKey(), reserveditem.getCount());
+                    if (price <= 0) continue;
+                    Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey());
                     break;
                 }
             }
@@ -323,8 +309,12 @@ public class RMIMiddleware extends ResourceManager {
         }
         if (yn_car && yn_room && yn_flight)
         {
-            boolean ret1 = reserveCar(xid, customerID, location);
-            boolean ret2 = reserveRoom(xid, customerID, location);
+            boolean ret1 = true;
+            if (car)
+                ret1 = reserveCar(xid, customerID, location);
+            boolean ret2 = true;
+            if (room)
+                ret2 = reserveRoom(xid, customerID, location);
             boolean ret3 = true;
             for (Integer i: flightNum_int)
             {

@@ -13,8 +13,16 @@ RMIInterface.jar: Server/Interface/IResourceManager.java
 	javac Server/Interface/IResourceManager.java
 	jar cvf RMIInterface.jar Server/Interface/IResourceManager.class
 
+ResourceManager.jar: Server/Common/ResourceManager.java
+	@echo "Compiling RM server interface"
+	javac Server/Common/ResourceManager.java
+	jar cvf ResourceManager.jar Server/Common/ResourceManager.class
+
 compile-server-rmi: Server/RMI/*.java Server/Interface/IResourceManager.java Server/Common/*.java
 	javac Server/RMI/*.java Server/Interface/IResourceManager.java Server/Common/*.java
+
+
+
 
 clean:
 	rm -f Server/Interface/*.class Server/Common/*.class Server/RMI/*.class

@@ -49,13 +49,21 @@ public class ResourceManager implements IResourceManager
 		}
 	}
 
-	protected void modifyData(int xid, String key, boolean plus, int num)
+
+	public int modify(int xid, String key, int num) throws RemoteException
 	{
-		ReservableItem item = (ReservableItem)readData(xid, key);
-		if (!plus)
-			num = - num;
+		ReservableItem item = (ReservableItem) readData(xid, key);
+		if (item == null)
+		{
+			return -1;
+		}
+		else if (item.getCount() + num < 0)
+		{
+			return 0;
+		}
 		item.setCount(item.getCount() + num);
 		item.setReserved(item.getReserved() - num);
+		return item.getPrice();
 	}
 
 	// Deletes the encar item

@@ -33,6 +33,8 @@ public interface IResourceManager extends Remote
      *
      * @return Success
      */
+    public int modify(int xid, String key, int num) throws RemoteException;
+
     public boolean addFlight(int id, int flightNum, int flightSeats, int flightPrice) 
 	throws RemoteException; 
     
