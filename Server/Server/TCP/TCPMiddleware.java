@@ -2,7 +2,6 @@ package Server.TCP;
 
 import Client.Command;
 import Server.Common.*;
-import Server.Interface.IResourceManager;
 
 import java.io.*;
 import java.net.*;
@@ -50,13 +49,43 @@ public class TCPMiddleware extends ResourceManager {
         if (args.length > 7)
             roomPort = Integer.parseInt(args[7]);
         if (args.length > 8) {
-            System.err.println((char) 27 + "[31;1mClient exception: " + (char) 27
-                    + "[0mUsage: java client.TCPClient [serverHost, serverPort]");
+            System.err.println((char) 27 + "[31;1mTCPMiddleware exception: " + (char) 27
+                    + "[0mUsage: java server.TCP.TCPMiddleware [serverHost, serverPort]");
             System.exit(1);
         }
-
-        TCPMiddleware tcp_middle = new TCPMiddleware(s_serverName, s_serverPort);
-        tcp_middle.acceptConnection();
+        try {
+            TCPMiddleware tcp_middle = new TCPMiddleware(s_serverName, s_serverPort);
+            while (true)
+                tcp_middle.acceptConnection();
+        } catch (Exception e) {
+            System.err.println((char) 27 + "[31;1mTCPMiddleware exception: " + (char) 27 + "[0mUncaught exception");
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+    // TODO check
+    public void acceptConnection()
+    {
+        try
+        {
+            ServerSocket server = new ServerSocket(listenPort);
+            Socket client_request = null;
+            while (true)
+            {
+                client_request = server.accept();
+                (new Thread(new MiddlewareHandler(client_request))).start();
+            }
+        }
+        catch (BindException e) {
+            System.err.println((char) 27 + "[31;1mTCPMiddleware exception: " + (char) 27 + "[0mUnbind exception");
+            e.printStackTrace();
+            System.exit(1);
+        }
+        catch (IOException e) {
+            System.err.println((char) 27 + "[31;1mTCPMiddleware exception: " + (char) 27 + "[0mIO exception");
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 
     protected boolean reserveItem(int xid, int customerID, String key, String location, String serverHost, int serverPort, Vector<String> arg)
@@ -166,26 +195,6 @@ public class TCPMiddleware extends ResourceManager {
         }
     }
 
-    public void acceptConnection()
-    {
-        try
-        {
-            ServerSocket server = new ServerSocket(listenPort);
-            Socket client_request = null;
-            while (true)
-            {
-                client_request = server.accept();
-                (new Thread(new MiddlewareHandler(client_request))).start();
-            }
-        }
-        catch (BindException e) {
-            // TODO
-        }
-        catch (IOException e) {
-            // TODO
-        }
-    }
-
     public boolean bundle(int xid, int customerID, Vector<String> flightNum, String location, boolean car, boolean room)
             throws RemoteException {
 
@@ -251,7 +260,7 @@ public class TCPMiddleware extends ResourceManager {
             msg.add(Integer.toString(customerID));
             msg.add(location);
             String carReserveRes = send_to_car(msg);
-            if (carReserveRes.equals("false")) {
+            if (carReserveRes == "false") {
                 return false;
             }
             msg.clear();
@@ -262,7 +271,7 @@ public class TCPMiddleware extends ResourceManager {
             msg.add(Integer.toString(customerID));
             msg.add(location);
             String roomReserveRes = send_to_room(msg);
-            if (roomReserveRes.equals("false")) {
+            if (roomReserveRes == "false") {
                 return false;
             }
             msg.clear();
@@ -273,7 +282,7 @@ public class TCPMiddleware extends ResourceManager {
             msg.add(Integer.toString(customerID));
             msg.add(num);
             String flightReserveRes = send_to_flight(msg);
-            if (flightReserveRes.equals("false")) {
+            if (flightReserveRes == "false") {
                 return false;
             }
             msg.clear();
@@ -322,126 +331,29 @@ public class TCPMiddleware extends ResourceManager {
         return ret;
     }
 
-    public String send_to_flight(Vector<String> arg) { return forward_server(flightHost, flightPort, arg);}
+    public String analytics(int xid, String item, int threshold, Vector<String> arguments) {
+        Trace.info("RM::analttics(" + xid + ", " + item + ", " + threshold + ") called");
 
-    public String send_to_car(Vector<String> arg) { return forward_server(carHost, carPort, arg);}
-
-    public String send_to_room(Vector<String> arg) { return forward_server(roomHost, roomPort, arg);}
-
-    public String execute(Command cmd, Vector<String> arguments) throws NumberFormatException
-    {
-        try {
-            String ret = "false";
-            switch (cmd) {
-                case AddFlight:
-                case DeleteFlight:
-                case QueryFlight:
-                case QueryFlightPrice: {
-
-                    ret = forward_server(flightHost, flightPort, arguments);
-                    break;
-                }
-                case AddCars:
-                case DeleteCars:
-                case QueryCars:
-                case QueryCarsPrice: {
-
-                    ret = forward_server(carHost, carPort, arguments);
-                    break;
-                }
-                case AddRooms:
-                case DeleteRooms:
-                case QueryRooms:
-                case QueryRoomsPrice: {
-
-                    ret = forward_server(roomHost, roomPort, arguments);
-                    break;
-                }
-                case AddCustomer: {
-
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customer = newCustomer(id);
-
-                    ret = Integer.toString(customer);
-                    break;
-                }
-                case AddCustomerID: {
-
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customerID = Integer.parseInt(arguments.elementAt(2));
-
-                    boolean yn = newCustomer(id, customerID);
-                    ret = Boolean.toString(yn);
-                    break;
-                }
-                case DeleteCustomer: {
-
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customerID = Integer.parseInt(arguments.elementAt(2));
-
-                    boolean yn = deleteCustomer(id, customerID);
-                    ret = Boolean.toString(yn);
-                    break;
-                }
-
-                case QueryCustomer: {
-
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customerID = Integer.parseInt(arguments.elementAt(2));
-
-                    ret = queryCustomerInfo(id, customerID);
-                    break;
-                }
-
-                case ReserveFlight: {
-
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customerID = Integer.parseInt(arguments.elementAt(2));
-                    int flightNum = Integer.parseInt(arguments.elementAt(3));
-
-                    ret = Boolean.toString(reserveFlight(id, customerID, flightNum, arguments));
-                    System.out.println("Flight Reserved");
-                    break;
-                }
-                case ReserveCar: {
-
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customerID = Integer.parseInt(arguments.elementAt(2));
-                    String location = arguments.elementAt(3);
-
-                    ret = Boolean.toString(reserveCar(id, customerID, location, arguments));
-                    System.out.println("Car Reserved");
-                    break;
-                }
-                case ReserveRoom: {
-
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customerID = Integer.parseInt(arguments.elementAt(2));
-                    String location = arguments.elementAt(3);
-
-                    ret = Boolean.toString(reserveRoom(id, customerID, location, arguments));
-                    System.out.println("Room Reserved");
-                    break;
-                }
-                case Bundle: {
-                    int id = Integer.parseInt(arguments.elementAt(1));
-                    int customerID = Integer.parseInt(arguments.elementAt(2));
-                    Vector<String> flightNumbers = new Vector<String>();
-                    for (int i = 0; i < arguments.size() - 6; ++i) {
-                        flightNumbers.addElement(arguments.elementAt(3 + i));
-                    }
-                    String location = arguments.elementAt(arguments.size() - 3);
-                    boolean car = Boolean.valueOf(arguments.elementAt(arguments.size() - 2));
-                    boolean room = Boolean.valueOf(arguments.elementAt(arguments.size() - 1));
-
-                    ret = Boolean.toString(bundle(id, customerID, flightNumbers, location, car, room));
-                }
+        String ret = "false";
+        switch (item) {
+            case "Flight": {
+                ret = send_to_flight(arguments);
+                break;
             }
-            return ret;
-        } catch (RemoteException e) {
-
+            case "Car": {
+                ret = send_to_car(arguments);
+                break;
+            }
+            case "Room": {
+                ret = send_to_room(arguments);
+                break;
+            }
+            default: {
+                Trace.warn("RM::analytics(" + xid + ", " + item + ", " + threshold + ") failed--item doesn't exist");
+                break;
+            }
         }
-        return "false";
+        return ret;
     }
 
     public class MiddlewareHandler implements Runnable {
@@ -463,23 +375,219 @@ public class TCPMiddleware extends ResourceManager {
                 writer = new BufferedWriter(new OutputStreamWriter(client_request.getOutputStream()));
                 reader = new ObjectInputStream(client_request.getInputStream());
 
-                Vector<String> arguments = (Vector<String>)reader.readObject();
+                Vector<String> arguments = (Vector<String>) reader.readObject();
 
                 Command cmd = Command.fromString((String)arguments.elementAt(0));
                 String ret = execute(cmd, arguments);
 
-                // TODO: return value from RM to Middle to client
                 writer.write(ret);
                 writer.flush();
             }
             catch (IOException e) {
-                // TODO
+                e.printStackTrace();
             }
             catch (ClassNotFoundException e) {
                 // TODO
+                e.printStackTrace();
             }
         }
 
+        public String execute(Command cmd, Vector<String> arguments) throws NumberFormatException
+        {
+            try {
+                String ret = "false";
+                switch (cmd) {
+                    case AddFlight:
+                    case DeleteFlight:
+                    case QueryFlight:
+                    case QueryFlightPrice: {
+
+                        ret = send_to_flight(arguments);
+                        break;
+                    }
+                    case AddCars:
+                    case DeleteCars:
+                    case QueryCars:
+                    case QueryCarsPrice: {
+
+                        ret = send_to_car(arguments);
+                        break;
+                    }
+                    case AddRooms:
+                    case DeleteRooms:
+                    case QueryRooms:
+                    case QueryRoomsPrice: {
+
+                        ret = send_to_room(arguments);
+                        break;
+                    }
+                    case AddCustomer: {
+
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customer = newCustomer(id);
+
+                        ret = Integer.toString(customer);
+                        break;
+                    }
+                    case AddCustomerID: {
+
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+
+                        boolean yn = newCustomer(id, customerID);
+                        ret = Boolean.toString(yn);
+                        break;
+                    }
+                    case DeleteCustomer: {
+
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+
+                        boolean yn = deleteCustomer(id, customerID);
+                        ret = Boolean.toString(yn);
+                        break;
+                    }
+
+                    case QueryCustomer: {
+
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+
+                        ret = queryCustomerInfo(id, customerID);
+                        break;
+                    }
+
+                    case ReserveFlight: {
+
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+                        int flightNum = Integer.parseInt(arguments.elementAt(3));
+
+                        ret = Boolean.toString(reserveFlight(id, customerID, flightNum, arguments));
+                        break;
+                    }
+                    case ReserveCar: {
+
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+                        String location = arguments.elementAt(3);
+
+                        ret = Boolean.toString(reserveCar(id, customerID, location, arguments));
+                        break;
+                    }
+                    case ReserveRoom: {
+
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+                        String location = arguments.elementAt(3);
+
+                        ret = Boolean.toString(reserveRoom(id, customerID, location, arguments));
+                        break;
+                    }
+                    case Bundle: {
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        int customerID = Integer.parseInt(arguments.elementAt(2));
+                        Vector<String> flightNumbers = new Vector<String>();
+                        for (int i = 0; i < arguments.size() - 6; ++i) {
+                            flightNumbers.addElement(arguments.elementAt(3 + i));
+                        }
+                        String location = arguments.elementAt(arguments.size() - 3);
+                        boolean car = Boolean.valueOf(arguments.elementAt(arguments.size() - 2));
+                        boolean room = Boolean.valueOf(arguments.elementAt(arguments.size() - 1));
+
+                        ret = Boolean.toString(bundle(id, customerID, flightNumbers, location, car, room));
+                    }
+                    case Analytics: {
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        String item = arguments.elementAt(2);
+                        int threshold = Integer.parseInt(arguments.elementAt(3));
+
+                        ret = analytics(id, item, threshold, arguments);
+                        break;
+                    }
+                }
+                return ret;
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
+            return "false";
+        }
+
+    }
+
+    public class TCPSendMsg {
+        public Socket rmClientSocket = null;
+        private BufferedReader reader = null;
+        private ObjectOutputStream writer = null;
+        public String serverHost = "localhost";
+        public int serverPort = 9999;
+
+        TCPSendMsg(String address, int port) {
+            serverHost = address;
+            serverPort = port;
+        }
+
+        public String send_msg(Vector<String> arguments) {
+            String ret = null;
+
+            connectServer();
+            try {
+                writer.writeObject(arguments);
+                writer.flush();
+                ret = reader.readLine();
+            } catch (IOException e) {
+                System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[0mIO exception");
+                e.printStackTrace();
+            }
+            disconnect();
+
+            return ret;
+        }
+
+        // connect to the RM server
+        private void connectServer() {
+            try {
+                rmClientSocket = new Socket(serverHost, serverPort);
+                reader = new BufferedReader(new InputStreamReader(rmClientSocket.getInputStream()));
+                writer = new ObjectOutputStream(rmClientSocket.getOutputStream());
+            } catch (UnknownHostException e) {
+                System.err.println((char) 27 + "[31;1mServer exception: " + (char) 27 + "[UnknownHost exception");
+                e.printStackTrace();
+                System.exit(1);
+            } catch (IOException e) {
+                System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[IO exception");
+                e.printStackTrace();
+                System.exit(1);
+            }
+        }
+
+        // disconnect to the RM server
+        private void disconnect() {
+            try {
+                writer.close();
+                reader.close();
+                rmClientSocket.close();
+            } catch (IOException e) {
+                System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[IO exception");
+                e.printStackTrace();
+                System.exit(1);
+            }
+        }
+    }
+
+    private String send_to_flight(Vector<String> arguments) {
+        TCPSendMsg sendMsg = new TCPSendMsg(flightHost, flightPort);
+        return sendMsg.send_msg(arguments);
+    }
+
+    private String send_to_car(Vector<String> arguments) {
+        TCPSendMsg sendMsg = new TCPSendMsg(carHost, carPort);
+        return sendMsg.send_msg(arguments);
+    }
+
+    private String send_to_room(Vector<String> arguments) {
+        TCPSendMsg sendMsg = new TCPSendMsg(roomHost, roomPort);
+        return sendMsg.send_msg(arguments);
     }
 
 }

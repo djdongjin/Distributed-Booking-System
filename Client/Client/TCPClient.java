@@ -7,7 +7,7 @@ import java.util.Vector;
 public class TCPClient extends Client {
 
     private String serverHost = "localhost";
-    private int serverPort = 8888;
+    private int serverPort = 9999;
 
     private Socket clientSocket = null;
     private BufferedReader reader = null;
@@ -23,7 +23,7 @@ public class TCPClient extends Client {
     public static void main(String[] args)
     {
         String serverHost = "localhost";
-        int serverPort = 8888;
+        int serverPort = 9999;
 
         if (args.length > 0)
             serverHost = args[0];

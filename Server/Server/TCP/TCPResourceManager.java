@@ -28,10 +28,21 @@ public class TCPResourceManager extends ResourceManager {
             s_serverName = args[0];
         if (args.length > 1)
             s_serverPort = Integer.parseInt(args[1]);
-
-        TCPResourceManager tcp_ResourceManager = new TCPResourceManager(s_serverName, s_serverPort);
-        while (true)
-            tcp_ResourceManager.acceptConnection();
+        if (args.length > 2)
+        {
+            System.err.println((char) 27 + "[31;1mTCPResourceManager exception: " + (char) 27
+                    + "[0mUsage: java server.TCP.TCPResourceManager [serverHost, serverPort]");
+            System.exit(1);
+        }
+        try {
+            TCPResourceManager tcp_ResourceManager = new TCPResourceManager(s_serverName, s_serverPort);
+            while (true)
+                tcp_ResourceManager.acceptConnection();
+        } catch (Exception e) {
+            System.err.println((char) 27 + "[31;1mTCPMiddleware exception: " + (char) 27 + "[0mUncaught exception");
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 
     public void acceptConnection()
@@ -125,7 +136,6 @@ public class TCPResourceManager extends ResourceManager {
                         break;
                     }
                     case AddCars: {
-
                         int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
                         int numCars = Integer.parseInt(arguments.elementAt(3));
@@ -136,7 +146,6 @@ public class TCPResourceManager extends ResourceManager {
                         break;
                     }
                     case AddRooms: {
-
                         int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
                         int numRooms = Integer.parseInt(arguments.elementAt(3));
@@ -150,7 +159,6 @@ public class TCPResourceManager extends ResourceManager {
                         break;
                     }
                     case DeleteFlight: {
-
                         int id = Integer.parseInt(arguments.elementAt(1));
                         int flightNum = Integer.parseInt(arguments.elementAt(2));
 
@@ -159,7 +167,6 @@ public class TCPResourceManager extends ResourceManager {
                         break;
                     }
                     case DeleteCars: {
-
                         int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
@@ -168,7 +175,6 @@ public class TCPResourceManager extends ResourceManager {
                         break;
                     }
                     case DeleteRooms: {
-
                         int id = Integer.parseInt(arguments.elementAt(1));
                         String location = arguments.elementAt(2);
 
@@ -176,15 +182,6 @@ public class TCPResourceManager extends ResourceManager {
                         ret = Boolean.toString(yn);
                         break;
                     }
-                    /*case DeleteCustomer: {
-
-                        int id = Integer.parseInt(arguments.elementAt(1));
-                        int customerID = Integer.parseInt(arguments.elementAt(2));
-
-                        boolean yn = deleteCustomer(id, customerID);
-                        ret = Boolean.toString(yn);
-                        break;
-                    }*/
                     case QueryFlight: {
 
                         int id = Integer.parseInt(arguments.elementAt(1));
