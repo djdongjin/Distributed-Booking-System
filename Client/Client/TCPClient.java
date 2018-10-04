@@ -360,6 +360,7 @@ public class TCPClient extends Client {
                 System.out.println("Price of rooms at this location: " + price);
                 break;
             }
+            // checked
             case ReserveFlight: {
                 checkArgumentsCount(4, arguments.size());
 
@@ -378,6 +379,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case ReserveCar: {
                 checkArgumentsCount(4, arguments.size());
 
@@ -448,7 +450,12 @@ public class TCPClient extends Client {
                 break;
             }
             case Analytics: {
-                String item = arguments.elementAt(1).equals("Flight") ? "Seat(s)" : arguments.elementAt(1) + "(s)";
+                //TODO Analytics
+                int id = Integer.parseInt(arguments.elementAt(1));
+                String item = arguments.elementAt(2);
+                int threshold = Integer.parseInt(arguments.elementAt(3));
+
+                item = item.equals("Flight") ? "Seat(s)" : arguments.elementAt(1) + "(s)";
 
                 String[] results = send_msg(arguments).split(";");
                 System.out.println("-----------------");
@@ -456,14 +463,16 @@ public class TCPClient extends Client {
                     String[] param = res.split(",");
                     System.out.println("There are(is) " + param[1] + item + " left in " + param[0] + " with price " + param[2]);
                 }
+                break;
             }
-            case Quit:
+            case Quit: {
                 checkArgumentsCount(1, arguments.size());
 
                 send_msg(arguments);
 
                 System.out.println("Quitting client");
                 System.exit(0);
+            }
         }
     }
 
@@ -485,8 +494,10 @@ public class TCPClient extends Client {
             writer.writeObject(arguments);
             writer.flush();
             System.out.println("Message sent.");
-            while ((ret = reader.readLine()) != null)
+            while ((ret = reader.readLine()) != null) {
                 System.out.println("Response received.");
+                break;
+            }
         } catch (IOException e) {
             System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[0mIO exception");
             e.printStackTrace();

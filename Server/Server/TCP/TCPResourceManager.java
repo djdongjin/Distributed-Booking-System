@@ -81,6 +81,23 @@ public class TCPResourceManager extends ResourceManager {
         return true;
     }
 
+    public String analytics(int xid, String item, int threshold) {
+        Trace.info("RM::analytics(" + xid + ", item=" + item + ", " + threshold + ") called");
+
+        String ret = "";
+
+        for (String itemKey : m_data.keySet()) {
+            ReservableItem resvItem = (ReservableItem) readData(xid, itemKey);
+            int count = resvItem.getCount();
+            if (count > 0 && count <= threshold) {
+                ret += resvItem.getKey() + "," + Integer.toString(count) + "," + Integer.toString(resvItem.getPrice())
+                        + ";";
+            }
+        }
+        ret += "\n";
+        return ret;
+    }
+
 
     public class RequestHandler implements Runnable {
 
@@ -242,7 +259,12 @@ public class TCPResourceManager extends ResourceManager {
 
                         // ret = Boolean.toString(reserveFlight(id, customerID, flightNum));
                         ret = String.valueOf(modify(id, Flight.getKey(flightNum), -1));
-                        System.out.println("Flight Reserved");
+                        if (ret.equals("-1"))
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Flight.getKey(flightNum) + ", " + flightNum + ") failed--No more items");
+                        else if (ret.equals("0"))
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Flight.getKey(flightNum) + ", " + flightNum + ") item doesn't exist");
+                        else
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Flight.getKey(flightNum) + ", " + flightNum + ") Flight Reserved");
                         break;
                     }
                     case ReserveCar: {
@@ -253,6 +275,12 @@ public class TCPResourceManager extends ResourceManager {
 
                         // ret = Boolean.toString(reserveCar(id, customerID, location));
                         ret = String.valueOf(modify(id, Car.getKey(location), -1));
+                        if (ret.equals("-1"))
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Car.getKey(location) + ", " + location + ") failed--No more items");
+                        else if (ret.equals("0"))
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Car.getKey(location) + ", " + location + ") item doesn't exist");
+                        else
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Car.getKey(location) + ", " + location + ") Car Reserved");
                         break;
                     }
                     case ReserveRoom: {
@@ -263,7 +291,12 @@ public class TCPResourceManager extends ResourceManager {
 
                         // ret = Boolean.toString(reserveRoom(id, customerID, location));
                         ret = String.valueOf(modify(id, Room.getKey(location), -1));
-                        System.out.println("Room Reserved");
+                        if (ret.equals("-1"))
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Room.getKey(location) + ", " + location + ") failed--No more items");
+                        else if (ret.equals("0"))
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Room.getKey(location) + ", " + location + ") item doesn't exist");
+                        else
+                            Trace.warn("RM::reserveItem(" + id + ", " + customerID + ", " + Room.getKey(location) + ", " + location + ") Room Reserved");
                         break;
                     }
                     case DeleteReservation: {
@@ -274,6 +307,14 @@ public class TCPResourceManager extends ResourceManager {
 
                         boolean yn = deleteReservation(id, customerID, reservedKey, reservedCount);
                         ret = Boolean.toString(yn);
+                        break;
+                    }
+                    case Analytics: {
+                        int id = Integer.parseInt(arguments.elementAt(1));
+                        String item = arguments.elementAt(2);
+                        int threshold = Integer.parseInt(arguments.elementAt(3));
+
+                        ret = analytics(id, item, threshold);
                         break;
                     }
                 }

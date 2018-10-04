@@ -91,25 +91,25 @@ public class TCPMiddleware extends ResourceManager {
 
     protected boolean reserveItem(int xid, int customerID, String key, String location, String serverHost, int serverPort, Vector<String> arg)
     {
-        Trace.info("TCP::reserveItem(" + xid + ", customer=" + customerID + ", " + key + ", " + location + ") called" );
+        Trace.info("Middleware::reserveItem(" + xid + ", customer=" + customerID + ", " + key + ", " + location + ") called" );
         // Read customer object if it exists (and read lock it)
         Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
         if (customer == null)
         {
-            Trace.warn("TCP::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ")  failed--customer doesn't exist");
+            Trace.warn("Middleware::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ")  failed--customer doesn't exist");
             return false;
         }
 
         // Check if the item is available
-        int price = Integer.parseInt(forward_server(flightHost, flightPort, arg));
+        int price = Integer.parseInt(forward_server(serverHost, serverPort, arg));
         if (price == -1)
         {
-            Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") failed--No more items");
+            Trace.warn("Middleware::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") failed--item doesn't exist");
             return false;
         }
         else if (price == 0)
         {
-            Trace.warn("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") item doesn't exist");
+            Trace.warn("Middleware::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") failed--No more items");
             return false;
         }
         else
@@ -117,7 +117,7 @@ public class TCPMiddleware extends ResourceManager {
             customer.reserve(key, location, price);
             writeData(xid, customer.getKey(), customer);
 
-            Trace.info("RM::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") succeeded");
+            Trace.info("Middleware::reserveItem(" + xid + ", " + customerID + ", " + key + ", " + location + ") succeeded");
             return true;
         }
     }
@@ -292,48 +292,8 @@ public class TCPMiddleware extends ResourceManager {
         return true;
     }
 
-    public String forward_server(String serverHost, int serverPort, Vector<String> arguments)
-    {
-        BufferedReader reader = null;
-        ObjectOutputStream writer = null;
-        String ret = null;
-        try {
-            Socket client = new Socket(serverHost, serverPort);
-            reader = new BufferedReader(new InputStreamReader(client.getInputStream()));
-            writer = new ObjectOutputStream(client.getOutputStream());
-        } catch (UnknownHostException e) {
-            System.err.println((char) 27 + "[31;1mServer exception: " + (char) 27 + "[UnknownHost exception");
-            e.printStackTrace();
-            System.exit(1);
-        } catch (IOException e) {
-            System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[IO exception");
-            e.printStackTrace();
-            System.exit(1);
-        }
-
-        try {
-            writer.writeObject(arguments);
-            writer.flush();
-            ret = reader.readLine();
-        } catch (IOException e) {
-            System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[0mIO exception");
-            e.printStackTrace();
-        }
-
-        try {
-            reader.close();
-            writer.close();
-        } catch (IOException e) {
-            System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[IO exception");
-            e.printStackTrace();
-            System.exit(1);
-        }
-
-        return ret;
-    }
-
     public String analytics(int xid, String item, int threshold, Vector<String> arguments) {
-        Trace.info("RM::analttics(" + xid + ", " + item + ", " + threshold + ") called");
+        Trace.info("Middleware::analytics(" + xid + ", " + item + ", " + threshold + ") called");
 
         String ret = "false";
         switch (item) {
@@ -502,6 +462,7 @@ public class TCPMiddleware extends ResourceManager {
                         boolean room = Boolean.valueOf(arguments.elementAt(arguments.size() - 1));
 
                         ret = Boolean.toString(bundle(id, customerID, flightNumbers, location, car, room));
+                        break;
                     }
                     case Analytics: {
                         int id = Integer.parseInt(arguments.elementAt(1));
@@ -596,6 +557,47 @@ public class TCPMiddleware extends ResourceManager {
     private String send_to_room(Vector<String> arguments) {
         TCPSendMsg sendMsg = new TCPSendMsg(roomHost, roomPort);
         return sendMsg.send_msg(arguments);
+    }
+
+    public String forward_server(String serverHost, int serverPort, Vector<String> arguments)
+    {
+        BufferedReader reader = null;
+        ObjectOutputStream writer = null;
+        String ret = null;
+        try {
+            Socket client = new Socket(serverHost, serverPort);
+            reader = new BufferedReader(new InputStreamReader(client.getInputStream()));
+            writer = new ObjectOutputStream(client.getOutputStream());
+        } catch (UnknownHostException e) {
+            System.err.println((char) 27 + "[31;1mServer exception: " + (char) 27 + "[UnknownHost exception");
+            e.printStackTrace();
+            System.exit(1);
+        } catch (IOException e) {
+            System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[IO exception");
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        try {
+            writer.writeObject(arguments);
+            writer.flush();
+            while ( (ret = reader.readLine()) != null )
+                break;
+        } catch (IOException e) {
+            System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[0mIO exception");
+            e.printStackTrace();
+        }
+
+        try {
+            reader.close();
+            writer.close();
+        } catch (IOException e) {
+            System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[IO exception");
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        return ret;
     }
 
 }
