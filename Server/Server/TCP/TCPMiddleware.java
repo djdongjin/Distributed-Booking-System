@@ -55,8 +55,10 @@ public class TCPMiddleware extends ResourceManager {
         }
         try {
             TCPMiddleware tcp_middle = new TCPMiddleware(s_serverName, s_serverPort);
-            while (true)
+            while (true) {
                 tcp_middle.acceptConnection();
+                System.out.println("Middleware::Connection interrupted, restart listening...");
+            }
         } catch (Exception e) {
             System.err.println((char) 27 + "[31;1mTCPMiddleware exception: " + (char) 27 + "[0mUncaught exception");
             e.printStackTrace();
@@ -69,6 +71,7 @@ public class TCPMiddleware extends ResourceManager {
         try
         {
             ServerSocket server = new ServerSocket(listenPort);
+            System.out.println("Middleware::Begin to listen at: " + listenPort);
             Socket client_request = null;
             while (true)
             {
@@ -139,10 +142,10 @@ public class TCPMiddleware extends ResourceManager {
 
     public boolean deleteCustomer(int xid, int customerID) throws RemoteException {
         Vector<String> msg = new Vector<String>();
-        Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") called");
+        Trace.info("Middleware::deleteCustomer(" + xid + ", " + customerID + ") called");
         Customer customer = (Customer) readData(xid, Customer.getKey(customerID));
         if (customer == null) {
-            Trace.warn("RM::deleteCustomer(" + xid + ", " + customerID + ") failed--customer doesn't exist");
+            Trace.warn("Middleware::deleteCustomer(" + xid + ", " + customerID + ") failed--customer doesn't exist");
             return false;
         } else {
             // Increase the reserved numbers of all reservable items which the customer
@@ -150,17 +153,16 @@ public class TCPMiddleware extends ResourceManager {
             RMHashMap reservations = customer.getReservations();
             for (String reservedKey : reservations.keySet()) {
                 ReservedItem reserveditem = customer.getReservedItem(reservedKey);
-                Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey()
+                Trace.info("Middleware::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey()
                         + " " + reserveditem.getCount() + " times");
 
                 String ret = "false";
-                String reservedItemKey = reserveditem.getKey();
                 switch (reservedKey.substring(0, 3)) {
                     case "fli": {
                         msg.add("DeleteReservation");
                         msg.add(Integer.toString(xid));
                         msg.add(Integer.toString(customerID));
-                        msg.add(reservedItemKey);
+                        msg.add(reservedKey);
                         msg.add(Integer.toString(reserveditem.getCount()));
                         ret = forward_server(flightHost, flightPort, msg);
                         break;
@@ -169,7 +171,7 @@ public class TCPMiddleware extends ResourceManager {
                         msg.add("DeleteReservation");
                         msg.add(Integer.toString(xid));
                         msg.add(Integer.toString(customerID));
-                        msg.add(reservedItemKey);
+                        msg.add(reservedKey);
                         msg.add(Integer.toString(reserveditem.getCount()));
                         ret = forward_server(carHost, carPort, msg);
                         break;
@@ -178,7 +180,7 @@ public class TCPMiddleware extends ResourceManager {
                         msg.add("DeleteReservation");
                         msg.add(Integer.toString(xid));
                         msg.add(Integer.toString(customerID));
-                        msg.add(reservedItemKey);
+                        msg.add(reservedKey);
                         msg.add(Integer.toString(reserveditem.getCount()));
                         ret = forward_server(roomHost, roomPort, msg);
                         break;
@@ -201,22 +203,6 @@ public class TCPMiddleware extends ResourceManager {
 
         String traceInfo = "RM::bundle(" + xid + ", customer=" + customerID;
         Vector<String> msg = new Vector<String>();
-        Vector<String> flightKey = new Vector<String>();
-        String carKey = "", roomKey = "";
-        for (String num : flightNum) {
-            flightKey.add(Flight.getKey(Integer.parseInt(num)));
-            traceInfo += ", " + flightKey;
-        }
-        if (car) {
-            carKey = Car.getKey(location);
-            traceInfo += ", " + carKey;
-        }
-        if (room) {
-            roomKey = Room.getKey(location);
-            traceInfo += ", " + roomKey;
-        }
-        traceInfo += ", " + location + ") ";
-        Trace.info(traceInfo + " called");
 
         // Read customer object if it exists (and read lock it)
         Customer customer = (Customer) readData(xid, Customer.getKey(customerID));
@@ -228,7 +214,7 @@ public class TCPMiddleware extends ResourceManager {
         if (car) {
             msg.add("QueryCars");
             msg.add(Integer.toString(xid));
-            msg.add(carKey);
+            msg.add(location);
             int carNum = Integer.parseInt(send_to_car(msg));
             if (carNum <= 0) {
                 return false;
@@ -238,7 +224,7 @@ public class TCPMiddleware extends ResourceManager {
         if (room) {
             msg.add("QueryRooms");
             msg.add(Integer.toString(xid));
-            msg.add(roomKey);
+            msg.add(location);
             int roomNum = Integer.parseInt(send_to_room(msg));
             if (roomNum <= 0) {
                 return false;
@@ -246,7 +232,7 @@ public class TCPMiddleware extends ResourceManager {
             msg.clear();
         }
         for (String num : flightNum) {
-            msg.add("Queryflight");
+            msg.add("QueryFlight");
             msg.add(Integer.toString(xid));
             msg.add(num);
             int seatNum = Integer.parseInt(send_to_flight(msg));
@@ -258,10 +244,11 @@ public class TCPMiddleware extends ResourceManager {
 
         if (car) {
             msg.add("ReserveCar");
+            msg.add(Integer.toString(xid));
             msg.add(Integer.toString(customerID));
             msg.add(location);
             String carReserveRes = send_to_car(msg);
-            if (carReserveRes == "false") {
+            if (carReserveRes.equals("false")) {
                 return false;
             }
             msg.clear();
@@ -269,10 +256,11 @@ public class TCPMiddleware extends ResourceManager {
 
         if (room) {
             msg.add("ReserveRoom");
+            msg.add(Integer.toString(xid));
             msg.add(Integer.toString(customerID));
             msg.add(location);
             String roomReserveRes = send_to_room(msg);
-            if (roomReserveRes == "false") {
+            if (roomReserveRes.equals("false")) {
                 return false;
             }
             msg.clear();
@@ -280,15 +268,15 @@ public class TCPMiddleware extends ResourceManager {
 
         for (String num : flightNum) {
             msg.add("ReserveFlight");
+            msg.add(Integer.toString(xid));
             msg.add(Integer.toString(customerID));
             msg.add(num);
             String flightReserveRes = send_to_flight(msg);
-            if (flightReserveRes == "false") {
+            if (flightReserveRes.equals("false")) {
                 return false;
             }
             msg.clear();
         }
-
         return true;
     }
 
@@ -297,20 +285,20 @@ public class TCPMiddleware extends ResourceManager {
 
         String ret = "false";
         switch (item) {
-            case "Flight": {
+            case "flight": {
                 ret = send_to_flight(arguments);
                 break;
             }
-            case "Car": {
+            case "car": {
                 ret = send_to_car(arguments);
                 break;
             }
-            case "Room": {
+            case "room": {
                 ret = send_to_room(arguments);
                 break;
             }
             default: {
-                Trace.warn("RM::analytics(" + xid + ", " + item + ", " + threshold + ") failed--item doesn't exist");
+                Trace.warn("Middleware::analytics(" + xid + ", " + item + ", " + threshold + ") failed--item doesn't exist");
                 break;
             }
         }

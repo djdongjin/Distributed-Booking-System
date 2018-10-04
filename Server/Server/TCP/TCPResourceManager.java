@@ -36,8 +36,10 @@ public class TCPResourceManager extends ResourceManager {
         }
         try {
             TCPResourceManager tcp_ResourceManager = new TCPResourceManager(s_serverName, s_serverPort);
-            while (true)
+            while (true) {
                 tcp_ResourceManager.acceptConnection();
+                System.out.println("RM::Connection interrupted, re-starting listening.");
+            }
         } catch (Exception e) {
             System.err.println((char) 27 + "[31;1mTCPMiddleware exception: " + (char) 27 + "[0mUncaught exception");
             e.printStackTrace();
@@ -51,6 +53,7 @@ public class TCPResourceManager extends ResourceManager {
         {
             ServerSocket server = new ServerSocket(listenPort);
             Socket client_request = null;
+            System.out.println("RM::Begin to listen at: " + listenPort);
             while (true)
             {
                 client_request = server.accept();

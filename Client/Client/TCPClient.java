@@ -451,17 +451,25 @@ public class TCPClient extends Client {
             }
             case Analytics: {
                 //TODO Analytics
+                checkArgumentsCount(4, arguments.size());
                 int id = Integer.parseInt(arguments.elementAt(1));
-                String item = arguments.elementAt(2);
+                String item = arguments.elementAt(2).toLowerCase();
                 int threshold = Integer.parseInt(arguments.elementAt(3));
+                arguments.setElementAt(item, 2);
 
-                item = item.equals("Flight") ? "Seat(s)" : arguments.elementAt(1) + "(s)";
+                if (item.equals("flight") || item.equals("car") || item.equals("room")) {
+                    item = item.equals("flight") ? "seat(s)" : arguments.elementAt(1) + "(s)";
 
-                String[] results = send_msg(arguments).split(";");
-                System.out.println("-----------------");
-                for (String res : results) {
-                    String[] param = res.split(",");
-                    System.out.println("There are(is) " + param[1] + item + " left in " + param[0] + " with price " + param[2]);
+                    String[] results = send_msg(arguments).split(";");
+                    System.out.println("-----------------");
+                    for (String res : results) {
+                        String[] param = res.split(",");
+                        System.out.println("There are(is) " + param[1] + item + " left in " + param[0] + " with price " + param[2]);
+                    }
+                }
+                else
+                {
+                    System.out.println("Analytics input error, input: " + item + ", expected: flight, room, car.");
                 }
                 break;
             }
