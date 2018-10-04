@@ -107,8 +107,9 @@ public class TCPResourceManager extends ResourceManager {
                 String ret = execute(cmd, arguments);
 
                 // TODO: return value from RM to Middle to client
-                writer.write(ret);
+                writer.write(ret+"\n");
                 writer.flush();
+                System.out.println("Server execuate successfully, return value:" + ret);
             }
             catch (IOException e) {
                 System.err.println((char)27 + "[31;1mIO exception: " + (char)27 + "[0mUncaught IOStream");
@@ -151,11 +152,8 @@ public class TCPResourceManager extends ResourceManager {
                         int numRooms = Integer.parseInt(arguments.elementAt(3));
                         int price = Integer.parseInt(arguments.elementAt(4));
 
-                        if (addRooms(id, location, numRooms, price)) {
-                            System.out.println("Rooms added");
-                        } else {
-                            System.out.println("Rooms could not be added");
-                        }
+                        boolean yn = addRooms(id, location, numRooms, price);
+                        ret = Boolean.toString(yn);
                         break;
                     }
                     case DeleteFlight: {
@@ -242,7 +240,8 @@ public class TCPResourceManager extends ResourceManager {
                         int customerID = Integer.parseInt(arguments.elementAt(2));
                         int flightNum = Integer.parseInt(arguments.elementAt(3));
 
-                        ret = Boolean.toString(reserveFlight(id, customerID, flightNum));
+                        // ret = Boolean.toString(reserveFlight(id, customerID, flightNum));
+                        ret = String.valueOf(modify(id, Flight.getKey(flightNum), -1));
                         System.out.println("Flight Reserved");
                         break;
                     }
@@ -252,7 +251,8 @@ public class TCPResourceManager extends ResourceManager {
                         int customerID = Integer.parseInt(arguments.elementAt(2));
                         String location = arguments.elementAt(3);
 
-                        ret = Boolean.toString(reserveCar(id, customerID, location));
+                        // ret = Boolean.toString(reserveCar(id, customerID, location));
+                        ret = String.valueOf(modify(id, Car.getKey(location), -1));
                         break;
                     }
                     case ReserveRoom: {
@@ -261,7 +261,8 @@ public class TCPResourceManager extends ResourceManager {
                         int customerID = Integer.parseInt(arguments.elementAt(2));
                         String location = arguments.elementAt(3);
 
-                        ret = Boolean.toString(reserveRoom(id, customerID, location));
+                        // ret = Boolean.toString(reserveRoom(id, customerID, location));
+                        ret = String.valueOf(modify(id, Room.getKey(location), -1));
                         System.out.println("Room Reserved");
                         break;
                     }

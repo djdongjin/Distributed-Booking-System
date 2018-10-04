@@ -73,6 +73,7 @@ public class TCPMiddleware extends ResourceManager {
             while (true)
             {
                 client_request = server.accept();
+                System.out.println("Client connected.");
                 (new Thread(new MiddlewareHandler(client_request))).start();
             }
         }
@@ -374,14 +375,18 @@ public class TCPMiddleware extends ResourceManager {
             {
                 writer = new BufferedWriter(new OutputStreamWriter(client_request.getOutputStream()));
                 reader = new ObjectInputStream(client_request.getInputStream());
+                while (true) {
+                    Vector<String> arguments = (Vector<String>) reader.readObject();
 
-                Vector<String> arguments = (Vector<String>) reader.readObject();
+                    Command cmd = Command.fromString((String) arguments.elementAt(0));
+                    if (cmd == Command.Quit)
+                        break;
+                    String ret = execute(cmd, arguments);
 
-                Command cmd = Command.fromString((String)arguments.elementAt(0));
-                String ret = execute(cmd, arguments);
-
-                writer.write(ret);
-                writer.flush();
+                    writer.write(ret + "\n");
+                    writer.flush();
+                    System.out.println("Middleware execute successfully, return value:" + ret);
+                }
             }
             catch (IOException e) {
                 e.printStackTrace();
@@ -421,6 +426,7 @@ public class TCPMiddleware extends ResourceManager {
                         ret = send_to_room(arguments);
                         break;
                     }
+                    // checked
                     case AddCustomer: {
 
                         int id = Integer.parseInt(arguments.elementAt(1));
@@ -534,14 +540,16 @@ public class TCPMiddleware extends ResourceManager {
             try {
                 writer.writeObject(arguments);
                 writer.flush();
-                ret = reader.readLine();
+                while((ret = reader.readLine()) != null)
+                {
+                    disconnect();
+                    return ret;
+                }
             } catch (IOException e) {
                 System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[0mIO exception");
                 e.printStackTrace();
             }
-            disconnect();
-
-            return ret;
+            return null;
         }
 
         // connect to the RM server

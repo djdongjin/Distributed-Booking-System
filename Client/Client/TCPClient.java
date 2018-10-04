@@ -57,7 +57,7 @@ public class TCPClient extends Client {
                     clientSocket = new Socket(serverHost, serverPort);
                     reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                     writer = new ObjectOutputStream(clientSocket.getOutputStream());
-                    System.out.println("Connected to '" + "' server [" + serverHost + ":" + serverPort +"]");
+                    System.out.println("Connected to server [" + serverHost + ":" + serverPort +"]");
                     break;
                 }
                 catch(UnknownHostException e) {
@@ -99,6 +99,7 @@ public class TCPClient extends Client {
     {
         switch (cmd)
         {
+            // checked
             case Help:
             {
                 if (arguments.size() == 1) {
@@ -111,6 +112,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case AddFlight: {
                 checkArgumentsCount(5, arguments.size());
 
@@ -126,6 +128,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case AddCars: {
                 checkArgumentsCount(5, arguments.size());
 
@@ -141,6 +144,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case AddRooms: {
                 checkArgumentsCount(5, arguments.size());
 
@@ -161,6 +165,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // Checked
             case AddCustomer: {
                 checkArgumentsCount(2, arguments.size());
 
@@ -172,6 +177,7 @@ public class TCPClient extends Client {
                 System.out.println("Add customer ID: " + customer);
                 break;
             }
+            // checked
             case AddCustomerID: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -188,6 +194,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case DeleteFlight: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -204,6 +211,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case DeleteCars: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -220,6 +228,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case DeleteRooms: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -236,6 +245,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case DeleteCustomer: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -252,6 +262,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case QueryFlight: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -265,6 +276,7 @@ public class TCPClient extends Client {
                 System.out.println("Number of seats available: " + seats);
                 break;
             }
+            // checked
             case QueryCars: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -278,6 +290,7 @@ public class TCPClient extends Client {
                 System.out.println("Number of cars at this location: " + numCars);
                 break;
             }
+            // checked
             case QueryRooms: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -291,6 +304,7 @@ public class TCPClient extends Client {
                 System.out.println("Number of rooms at this location: " + numRoom);
                 break;
             }
+            // TODO
             case QueryCustomer: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -304,6 +318,7 @@ public class TCPClient extends Client {
                 System.out.print(bill);
                 break;
             }
+            // checked
             case QueryFlightPrice: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -317,6 +332,7 @@ public class TCPClient extends Client {
                 System.out.println("Price of a seat: " + price);
                 break;
             }
+            // checked
             case QueryCarsPrice: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -330,6 +346,7 @@ public class TCPClient extends Client {
                 System.out.println("Price of cars at this location: " + price);
                 break;
             }
+            // checked
             case QueryRoomsPrice: {
                 checkArgumentsCount(3, arguments.size());
 
@@ -443,6 +460,8 @@ public class TCPClient extends Client {
             case Quit:
                 checkArgumentsCount(1, arguments.size());
 
+                send_msg(arguments);
+
                 System.out.println("Quitting client");
                 System.exit(0);
         }
@@ -465,7 +484,9 @@ public class TCPClient extends Client {
         try {
             writer.writeObject(arguments);
             writer.flush();
-            ret = reader.readLine();
+            System.out.println("Message sent.");
+            while ((ret = reader.readLine()) != null)
+                System.out.println("Response received.");
         } catch (IOException e) {
             System.err.println((char) 27 + "[31;1mIO exception: " + (char) 27 + "[0mIO exception");
             e.printStackTrace();

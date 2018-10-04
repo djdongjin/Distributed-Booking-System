@@ -10,4 +10,4 @@ echo '  $6 - port of Cars'
 echo '  $7 - hostname of Rooms'
 echo '  $8 - port of Rooms'
 
-java -cp ../Client/Command.jar:. -Djava.security.policy=java.policy -Djava.rmi.server.codebase=file:$(pwd)/ Server.TCP.TCPMiddleWare $1 $2 $3 $4 $5 $6 $7 $8
+java -cp ../Client/Command.jar:. -Djava.security.policy=java.policy -Djava.rmi.server.codebase=file:$(pwd)/ Server.TCP.TCPMiddleware $1 $2 $3 $4 $5 $6 $7 $8

@@ -8,13 +8,13 @@ java.policy: FORCE
 
 FORCE: ;
 
-../Client/Command.jar: ../Client/Client/Command.java
-    make -C ../Client/Command.jar
-
 RMIInterface.jar: Server/Interface/IResourceManager.java
 	@echo "Compiling RMI server interface"
 	javac Server/Interface/IResourceManager.java
 	jar cvf RMIInterface.jar Server/Interface/IResourceManager.class
+
+../Client/Command.jar: ../Client/Client/Command.java
+	make -C ../Client/ Command.jar
 
 compile-server-rmi: Server/RMI/*.java Server/Interface/IResourceManager.java Server/Common/*.java
 	javac Server/RMI/*.java Server/Interface/IResourceManager.java Server/Common/*.java
