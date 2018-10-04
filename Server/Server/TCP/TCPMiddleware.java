@@ -343,6 +343,10 @@ public class TCPMiddleware extends ResourceManager {
                 // TODO
                 e.printStackTrace();
             }
+            catch (Exception e) {
+                e.printStackTrace();
+                System.out.println("Middleware execute failed, please retry.");
+            }
         }
 
         public String execute(Command cmd, Vector<String> arguments) throws NumberFormatException
