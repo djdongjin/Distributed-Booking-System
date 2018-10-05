@@ -463,7 +463,12 @@ public class TCPClient extends Client {
                 if (item.equals("flight") || item.equals("car") || item.equals("room")) {
                     item = item.equals("flight") ? "seat(s)" : arguments.elementAt(2) + "(s)";
 
-                    String[] results = send_msg(arguments).split(";");
+                    String ret = send_msg(arguments);
+                    if (ret.equals("false")) {
+                        System.out.println("There is no item left less than " + threshold);
+                        break;
+                    }
+                    String[] results = ret.split(";");
                     System.out.println("-----------------");
                     for (String res : results) {
                         String[] param = res.split(",");

@@ -97,7 +97,8 @@ public class TCPResourceManager extends ResourceManager {
                         + ";";
             }
         }
-        ret += "\n";
+        if (ret.equals(""))
+            ret = "false";
         return ret;
     }
 
