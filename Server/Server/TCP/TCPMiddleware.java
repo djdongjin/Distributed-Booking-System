@@ -333,8 +333,12 @@ public class TCPMiddleware extends ResourceManager {
                     Vector<String> arguments = (Vector<String>) reader.readObject();
 
                     Command cmd = Command.fromString((String) arguments.elementAt(0));
-                    if (cmd == Command.Quit)
+                    if (cmd == Command.Quit) {
+                        writer.write("Bye!\n");
+                        writer.flush();
                         break;
+                    }
+
                     String ret = execute(cmd, arguments);
 
                     writer.write(ret + "\n");
