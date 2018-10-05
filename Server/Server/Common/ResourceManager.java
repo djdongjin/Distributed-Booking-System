@@ -61,8 +61,12 @@ public class ResourceManager implements IResourceManager
 		{
 			return 0;
 		}
+		int original = item.getCount();
 		item.setCount(item.getCount() + num);
 		item.setReserved(item.getReserved() - num);
+		writeData(xid, key, item);
+		int new_count = item.getCount();
+		Trace.info("RM::modify (" + xid + ", " + key + ") called, old count: " + original +" , new count: " + new_count);
 		return item.getPrice();
 	}
 

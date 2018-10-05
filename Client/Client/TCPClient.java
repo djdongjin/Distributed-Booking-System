@@ -314,8 +314,10 @@ public class TCPClient extends Client {
                 int id = toInt(arguments.elementAt(1));
                 int customerID = toInt(arguments.elementAt(2));
 
-                String bill = send_msg(arguments);
-                System.out.print(bill);
+                String[] bills = send_msg(arguments).split(";");
+                // String bill = send_msg(arguments);
+                for (String bill: bills)
+                    System.out.println(bill);
                 break;
             }
             // checked
@@ -449,6 +451,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case Analytics: {
                 //TODO Analytics
                 checkArgumentsCount(4, arguments.size());
@@ -458,7 +461,7 @@ public class TCPClient extends Client {
                 arguments.setElementAt(item, 2);
 
                 if (item.equals("flight") || item.equals("car") || item.equals("room")) {
-                    item = item.equals("flight") ? "seat(s)" : arguments.elementAt(1) + "(s)";
+                    item = item.equals("flight") ? "seat(s)" : arguments.elementAt(2) + "(s)";
 
                     String[] results = send_msg(arguments).split(";");
                     System.out.println("-----------------");
@@ -473,6 +476,7 @@ public class TCPClient extends Client {
                 }
                 break;
             }
+            // checked
             case Quit: {
                 checkArgumentsCount(1, arguments.size());
 

@@ -247,10 +247,12 @@ public class TCPMiddleware extends ResourceManager {
             msg.add(Integer.toString(xid));
             msg.add(Integer.toString(customerID));
             msg.add(location);
-            String carReserveRes = send_to_car(msg);
+            if (reserveCar(xid,customerID,location,msg) == false)
+                return false;
+            /*String carReserveRes = send_to_car(msg);
             if (carReserveRes.equals("false")) {
                 return false;
-            }
+            }*/
             msg.clear();
         }
 
@@ -259,10 +261,12 @@ public class TCPMiddleware extends ResourceManager {
             msg.add(Integer.toString(xid));
             msg.add(Integer.toString(customerID));
             msg.add(location);
-            String roomReserveRes = send_to_room(msg);
+            if (reserveRoom(xid,customerID,location,msg) == false)
+                return false;
+            /*String roomReserveRes = send_to_room(msg);
             if (roomReserveRes.equals("false")) {
                 return false;
-            }
+            }*/
             msg.clear();
         }
 
@@ -271,10 +275,12 @@ public class TCPMiddleware extends ResourceManager {
             msg.add(Integer.toString(xid));
             msg.add(Integer.toString(customerID));
             msg.add(num);
-            String flightReserveRes = send_to_flight(msg);
+            if (reserveFlight(xid,customerID, Integer.parseInt(num),msg) == false)
+                return false;
+            /*String flightReserveRes = send_to_flight(msg);
             if (flightReserveRes.equals("false")) {
                 return false;
-            }
+            }*/
             msg.clear();
         }
         return true;
@@ -412,6 +418,8 @@ public class TCPMiddleware extends ResourceManager {
                         int customerID = Integer.parseInt(arguments.elementAt(2));
 
                         ret = queryCustomerInfo(id, customerID);
+                        String [] info = ret.split("\n");
+                        ret = String.join(";", info);
                         break;
                     }
 
