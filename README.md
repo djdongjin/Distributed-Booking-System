@@ -1,4 +1,13 @@
-# comp512-project
+# COMP-512 Project
+
+Goal: construct a distributed, concurrency, fault-tolerant booking system.
+
+## Milestone 1
+
+Reconstruct the one client-one server system to a distributed client-middleware-server architecture.
+
+First implement communication using Java RMI, then rewrite inter-communication between each two layers using TCP/IP Socket.
+
 
 To run the RMI resource manager:
 
@@ -14,7 +23,6 @@ To run the RMI client:
 cd Client
 ./run_client.sh [<server_hostname> [<server_rmi_name>]]
 ```
-
 
 Make first:
 
