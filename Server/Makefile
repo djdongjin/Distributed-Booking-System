@@ -1,4 +1,4 @@
-all: java.policy compile-server-tcp
+all: java.policy compile-server-rmi
 
 java.policy: FORCE
 	@echo "Creating server java policy"

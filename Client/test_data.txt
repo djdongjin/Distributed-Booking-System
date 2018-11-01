@@ -1,55 +1,46 @@
-addcustomer,567
-addcustomerid,765,123
+1. Adding data + Distribution
+AddFlight,0,1,3,10
+AddCars,0,Montreal,5,20
+AddRooms,0,Montreal,1,100
 
-addflight,512,11,21,31
-addflight,513,12,22,32
+2. Querying data + Distribution
+QueryFlight,0,1
+QueryFlight,0,2
+QueryCars,0,Montreal
+QueryRooms,0,Paris
+QueryFlightPrice,0,1
 
-addrooms,544,montreal,3,200
-addrooms,545,toronto,2,300
+3. Basic Customers
+AddCustomer,0
+AddCustomerID,0,1
+QueryCustomer,0,1
+QueryCustomer,0,100
 
-addcars,3133,montreal,31,100
-addcars,3134,toronto,3,200
+4. Reservations + Customers (bill)
+QueryFlight,0,1
+ReserveFlight,0,1,1
+QueryFlight,0,1
+QueryCustomer,0,1
+DeleteFlight,0,1
 
+QueryCars,0,Montreal
+ReserveCar,0,1,Montreal
+QueryCustomer,0,1
 
-reservecar,413,123,montreal
+5. Bundle
+QueryFlight,0,1
+QueryFlight,0,2
+QueryCars,0,Montreal
+QueryRooms,0,Montreal
+Bundle,0,1,1,2,Montreal,true,true
+QueryFlight,0,1
+QueryFlight,0,2
+QueryCars,0,Montreal
+QueryRooms,0,Montreal
+QueryCustomer,0,1
 
-reserveroom,322,123,montreal
-
-
-// Test bundle
-addcustomerid,21,123
-addcustomerid,12312,333
-addflight,312,444,10,11
-addflight,31232,555,10,11
-addrooms,123213,NY,10,11
-addcars,123123,NY,10,11
-bundle,12312,333,444,555,NY,true,true
-querycustomer,12121,333
-
-queryflight,,543,555
-deleteflight,543,555
-deletecustomer,3123,333
-
-analytics,11,flight,11
-
-reserveflight,35,333,444
-reserveroom,1231,333,NY
-reservecar,231,333,NY
-
-
-deleteflight,543,555
-
------
-./run_server_tcp.sh flight 7200
-
-./run_server_tcp.sh car 7200
-
-./run_server_tcp.sh room 7200
-
-./run_middleware_tcp.sh middle 7200 lab2-11.cs.mcgill.ca 7200 lab2-12.cs.mcgill.ca 7200 lab2-13.cs.mcgill.ca 7200
-
-./run_client_tcp.sh lab2-14.cs.mcgill.ca 7200
-
-
-
-./run_middleware_tcp.sh middle 7205 lab2-11.cs.mcgill.ca 7205 lab2-12.cs.mcgill.ca 7205 lab2-13.cs.mcgill.ca 7205
+Bundle,0,1,1,Montreal,true,true
+QueryFlight,0,1
+QueryCars,0,Montreal
+QueryRooms,0,Montreal
+QueryCustomer,0,1

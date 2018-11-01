@@ -63,8 +63,10 @@ public class LockManager
 						}
 
 						if (bConvert.get(0) == true) {
-							//TODO: Lock conversion 
-							// Trace.info("LM::lock(" + xid + ", " + data + ", " + lockType + ") converted");
+							//TODO: Lock conversion
+							this.lockTable.add(xLockObject);
+							this.lockTable.add(dataLockObject);
+							Trace.info("LM::lock(" + xid + ", " + data + ", " + lockType + ") converted");
 						} else {
 							// Lock request that is not lock conversion
 							this.lockTable.add(xLockObject);
@@ -155,7 +157,7 @@ public class LockManager
 								{
 									break;
 								}
-
+								// Checked, could grant WRITE lock
 								this.waitTable.remove(waitLockObject);     
 								try {
 									synchronized(waitLockObject.getThread()) {
@@ -228,6 +230,26 @@ public class LockManager
 					// Seeing the comments at the top of this function might be helpful
 
 					//TODO: Lock conversion
+					if (l_dataLockObject.getLockType() == TransactionLockObject.LockType.LOCK_WRITE) {
+						// (2)
+						throw new RedundantLockRequestException(dataLockObject.getXId(), "redundant WRITE lock request");
+					} else if (l_dataLockObject.getLockType() == TransactionLockObject.LockType.LOCK_READ) {
+						// (1)
+						for (int j = 0; j < size; j++)
+						{
+							DataLockObject l2_dataLockObject = (DataLockObject)vect.elementAt(j);
+							if (dataLockObject.getXId() != l2_dataLockObject.getXId()) {
+								Trace.info("LM::lockConflict(" + dataLockObject.getXId() + ", " + dataLockObject.getDataName() + ") Want WRITE, someone has READ/WRITE");
+								return true;
+							}
+						}
+						// no others has lock, can grant WRITE and remove its READ
+						this.lockTable.remove(l_dataLockObject);
+						TransactionLockObject l_transactionLockObject = new TransactionLockObject(l_dataLockObject.getXId(), l_dataLockObject.getDataName(), l_dataLockObject.getLockType());
+						this.lockTable.remove(l_transactionLockObject);
+						bitset.set(0, true);
+						return false;
+					}
 				}
 			} 
 			else if (dataLockObject.getLockType() == TransactionLockObject.LockType.LOCK_READ)
