@@ -91,6 +91,16 @@ public class RMIMiddleware extends ResourceManager {
             final Registry registry = l_registry;
             registry.rebind(s_rmiPrefix + s_serverName, middlewareServer);
 
+            // time-to-live mechanism
+            Thread time_to_live = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (true) {
+                        middle.timeoutDetect();
+                    }
+                }
+            });
+
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 public void run() {
                     try {
@@ -114,6 +124,22 @@ public class RMIMiddleware extends ResourceManager {
     public RMIMiddleware(String name)
     {
         super(name);
+    }
+
+    public void timeoutDetect()
+    {
+        for (Integer xid : tm.activeTransaction()) {
+            if (!tm.checkTime(xid)) {
+                abort(xid);
+                System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
+                break;
+            }
+        }
+        try {
+            Thread.sleep(100);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public void connectServer(String tp, String server, int port, String name)

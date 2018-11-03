@@ -1,3 +1,3 @@
-grant codebase "file:/Users/dongjin/code/COMP512/pj1/Server/" {
+grant codebase "file:/Users/dongjin/code/comp512/pj1/server/" {
 	permission java.security.AllPermission;
 };
