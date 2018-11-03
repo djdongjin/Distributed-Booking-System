@@ -1,6 +1,7 @@
 package Server.Common;
 
 import Server.Interface.*;
+import Server.LockManager.*;
 
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -25,6 +26,9 @@ public class RMIMiddleware extends ResourceManager {
     private static String s_roomHost = "localhost";
     private static int s_roomPort = 1099;
     private static String s_roomName = "Room";
+
+    protected LockManager lm = new LockManager();
+    protected TransactionManager tm = new TransactionManager();
 
     private IResourceManager flightRM = null;
     private IResourceManager carRM = null;
@@ -150,9 +154,29 @@ public class RMIMiddleware extends ResourceManager {
         }
     }
 
-    // Reserve an item
-    protected boolean reserveItem(int xid, int customerID, String key, String location, IResourceManager rm) throws RemoteException
+    private void lockSomething(int xid, String key, TransactionLockObject.LockType lc) throws TransactionAbortedException, InvalidTransactionException
     {
+        if (!tm.tranactionExist(xid))
+        {
+            throw new InvalidTransactionException(xid, "transaction not exist.");
+        }
+        try {
+            boolean yn = lm.Lock(xid, key, lc);
+            if (!yn)
+            {
+                abort(xid);
+                throw new TransactionAbortedException(xid, "lock is not granted.");
+            }
+        } catch (DeadlockException e) {
+            abort(xid);
+            throw new TransactionAbortedException(xid, "deadlock.");
+        }
+    }
+    // Reserve an item
+    protected boolean reserveItem(int xid, int customerID, String key, String location, IResourceManager rm) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        lockSomething(xid, key, TransactionLockObject.LockType.LOCK_WRITE);
+        lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_WRITE);
         Trace.info("RM::reserveItem(" + xid + ", customer=" + customerID + ", " + key + ", " + location + ") called" );
         // Read customer object if it exists (and read lock it)
         Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
@@ -184,8 +208,9 @@ public class RMIMiddleware extends ResourceManager {
         }
     }
 
-    public boolean deleteCustomer(int xid, int customerID) throws RemoteException
+    public boolean deleteCustomer(int xid, int customerID) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_WRITE);
         Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") called");
         Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
         if (customer == null)
@@ -217,82 +242,94 @@ public class RMIMiddleware extends ResourceManager {
         }
     }
 
-    public boolean addFlight(int xid, int flightNum, int flightSeats, int flightPrice) throws RemoteException
+    public boolean addFlight(int xid, int flightNum, int flightSeats, int flightPrice) throws RemoteException, TransactionAbortedException, InvalidTransactionException, TransactionAbortedException
     {
+        lockSomething(xid, Flight.getKey(flightNum), TransactionLockObject.LockType.LOCK_WRITE);
         return flightRM.addFlight(xid, flightNum, flightSeats, flightPrice);
     }
 
-    public boolean addCars(int xid, String location, int count, int price) throws RemoteException
+    public boolean addCars(int xid, String location, int count, int price) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Car.getKey(location), TransactionLockObject.LockType.LOCK_WRITE);
         return carRM.addCars(xid, location, count, price);
     }
 
-    public boolean addRooms(int xid, String location, int count, int price) throws RemoteException
+    public boolean addRooms(int xid, String location, int count, int price) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Room.getKey(location), TransactionLockObject.LockType.LOCK_WRITE);
         return roomRM.addRooms(xid, location, count, price);
     }
 
-    public boolean deleteFlight(int xid, int flightNum) throws RemoteException
+    public boolean deleteFlight(int xid, int flightNum) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Flight.getKey(flightNum), TransactionLockObject.LockType.LOCK_WRITE);
         return flightRM.deleteFlight(xid, flightNum);
     }
 
-    public boolean deleteCars(int xid, String location) throws RemoteException
+    public boolean deleteCars(int xid, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Car.getKey(location), TransactionLockObject.LockType.LOCK_WRITE);
         return carRM.deleteCars(xid, location);
     }
 
-    public boolean deleteRooms(int xid, String location) throws RemoteException
+    public boolean deleteRooms(int xid, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Room.getKey(location), TransactionLockObject.LockType.LOCK_WRITE);
         return roomRM.deleteRooms(xid, location);
     }
 
-    public int queryFlight(int xid, int flightNum) throws RemoteException
+    public int queryFlight(int xid, int flightNum) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Flight.getKey(flightNum), TransactionLockObject.LockType.LOCK_READ);
         return flightRM.queryFlight(xid, flightNum);
     }
 
-    public int queryCars(int xid, String location) throws RemoteException
+    public int queryCars(int xid, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Car.getKey(location), TransactionLockObject.LockType.LOCK_READ);
         return carRM.queryCars(xid, location);
     }
 
-    public int queryRooms(int xid, String location) throws RemoteException
+    public int queryRooms(int xid, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Room.getKey(location), TransactionLockObject.LockType.LOCK_READ);
         return roomRM.queryRooms(xid, location);
     }
 
-    public int queryFlightPrice(int xid, int flightNum) throws RemoteException
+    public int queryFlightPrice(int xid, int flightNum) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Flight.getKey(flightNum), TransactionLockObject.LockType.LOCK_READ);
         return flightRM.queryFlightPrice(xid, flightNum);
     }
 
-    public int queryCarsPrice(int xid, String location) throws RemoteException
+    public int queryCarsPrice(int xid, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Car.getKey(location), TransactionLockObject.LockType.LOCK_READ);
         return carRM.queryCarsPrice(xid, location);
     }
 
-    public int queryRoomsPrice(int xid, String location) throws RemoteException
+    public int queryRoomsPrice(int xid, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        lockSomething(xid, Room.getKey(location), TransactionLockObject.LockType.LOCK_READ);
         return roomRM.queryRoomsPrice(xid, location);
     }
 
-    public boolean reserveFlight(int xid, int customerID, int flightNum) throws RemoteException
+    public boolean reserveFlight(int xid, int customerID, int flightNum) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         return reserveItem(xid, customerID, Flight.getKey(flightNum), String.valueOf(flightNum), flightRM);
     }
 
-    public boolean reserveCar(int xid, int customerID, String location) throws RemoteException
+    public boolean reserveCar(int xid, int customerID, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         return reserveItem(xid, customerID, Car.getKey(location), location, carRM);
     }
 
-    public boolean reserveRoom(int xid, int customerID, String location) throws RemoteException
+    public boolean reserveRoom(int xid, int customerID, String location) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         return reserveItem(xid, customerID, Room.getKey(location), location, roomRM);
     }
 
-    public boolean bundle(int xid, int customerID, Vector<String> flightNum, String location, boolean car, boolean room) throws RemoteException
+    public boolean bundle(int xid, int customerID, Vector<String> flightNum, String location, boolean car, boolean room) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         boolean yn_car = !car || carRM.queryCars(xid, location) > 0;
         boolean yn_room = !room || roomRM.queryRooms(xid, location) > 0;
@@ -331,4 +368,39 @@ public class RMIMiddleware extends ResourceManager {
     {
         return m_name;
     }
+
+    public int start()
+    {
+        return tm.start();
+    }
+
+    public boolean commit(int id)
+    {
+        lm.UnlockAll(id);
+        origin_data.remove(id);
+        return tm.commit(id);
+    }
+
+    public boolean abort(int id)
+    {
+        lm.UnlockAll(id);
+        RMHashMap data = origin_data.get(id);
+        if (data != null) {
+            for (String key : data.keySet()) {
+                if (data.get(key) == null) {
+                    synchronized (m_data) {
+                        m_data.remove(key);
+                    }
+                } else {
+                    synchronized (m_data) {
+                        m_data.put(key, data.get(key));
+                    }
+                }
+            }
+            origin_data.remove(id);
+        }
+
+        return tm.abort(id);
+    }
+
 }

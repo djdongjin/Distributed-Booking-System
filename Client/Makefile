@@ -16,8 +16,14 @@ Command.jar: Client/Command.java
 ../Server/RMIInterface.jar: ../Server/Server/Interface/IResourceManager.java
 	make -C ../Server/ RMIInterface.jar
 
-compile-client: ../Server/RMIInterface.jar
-	javac -cp ../Server/RMIInterface.jar Client/*.java
+../Server/TransactionException.jar: ../Server/Server/LockManager/*.java
+	make -C ../Server/ TransactionException.jar
+
+#../Server/InvalidTransactionException.jar: ../Server/Server/LockManager/InvalidTransactionException.java
+#	make -C ../Server/ InvalidTransactionException.jar
+
+compile-client: ../Server/RMIInterface.jar ../Server/TransactionException.jar
+	javac -cp ../Server/TransactionException.jar:../Server/RMIInterface.jar Client/*.java
 
 clean:
 	rm -f Client/*.class

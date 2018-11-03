@@ -1,6 +1,7 @@
 package Client;
 
 import Server.Interface.*;
+import Server.LockManager.*;
 
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
