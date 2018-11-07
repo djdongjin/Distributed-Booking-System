@@ -446,13 +446,13 @@ public class ResourceManager implements IResourceManager
 		return -1;
 	}
 
-	public boolean commit(int id)
+	public boolean commit(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException
 	{
 		origin_data.remove(id);
 		return true;
 	}
 
-	public boolean abort(int id)
+	public boolean abort(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException
 	{
 		RMHashMap data = origin_data.get(id);
 		if (data != null) {

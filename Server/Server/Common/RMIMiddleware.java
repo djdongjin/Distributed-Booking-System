@@ -432,7 +432,7 @@ public class RMIMiddleware extends ResourceManager {
         return m_name;
     }
 
-    private void lockSomething(int xid, String key, TransactionLockObject.LockType lc) throws TransactionAbortedException, InvalidTransactionException
+    private void lockSomething(int xid, String key, TransactionLockObject.LockType lc) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         if (!tm.transactionExist(xid))
         {
@@ -458,14 +458,14 @@ public class RMIMiddleware extends ResourceManager {
 
     public void timeoutDetect()
     {
-        for (Integer xid : tm.activeTransaction()) {
-            if (!tm.checkTime(xid)) {
-                abort(xid);
-                System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
-                break;
-            }
-        }
         try {
+            for (Integer xid : tm.activeTransaction()) {
+                if (!tm.checkTime(xid)) {
+                    abort(xid);
+                    System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
+                    break;
+                }
+            }
             Thread.sleep(100);
         } catch (Exception e) {
             e.printStackTrace();
@@ -477,8 +477,12 @@ public class RMIMiddleware extends ResourceManager {
         return tm.start();
     }
 
-    public boolean commit(int xid)
+    public boolean commit(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        if (!tm.transactionExist(xid))
+        {
+            throw new InvalidTransactionException(xid, "transaction not exist.");
+        }
         lm.UnlockAll(xid);
         synchronized (origin_data) {
             origin_data.remove(xid);
@@ -486,8 +490,12 @@ public class RMIMiddleware extends ResourceManager {
         return tm.commit(xid);
     }
 
-    public boolean abort(int xid)
+    public boolean abort(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        if (!tm.transactionExist(xid))
+        {
+            throw new InvalidTransactionException(xid, "transaction not exist.");
+        }
         lm.UnlockAll(xid);
         synchronized (origin_data) {
             RMHashMap data = origin_data.get(xid);

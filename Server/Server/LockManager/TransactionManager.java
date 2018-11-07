@@ -47,7 +47,7 @@ public class TransactionManager {
 //        }
     }
 
-    public boolean commit(int xid)
+    public boolean commit(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         try {
             for (IResourceManager rm : xid_rm.get(xid)) {
@@ -66,7 +66,7 @@ public class TransactionManager {
         return true;
     }
 
-    public boolean abort(int xid)
+    public boolean abort(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         try {
             for (IResourceManager rm : xid_rm.get(xid)) {
