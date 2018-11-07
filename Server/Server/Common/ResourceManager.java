@@ -352,11 +352,11 @@ public class ResourceManager implements IResourceManager
 
 	public int newCustomer(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
 	{
-        	Trace.info("RM::newCustomer(" + xid + ") called");
+		Trace.info("RM::newCustomer(" + xid + ") called");
 		// Generate a globally unique ID for the new customer
 		int cid = Integer.parseInt(String.valueOf(xid) +
-			String.valueOf(Calendar.getInstance().get(Calendar.MILLISECOND)) +
-			String.valueOf(Math.round(Math.random() * 100 + 1)));
+		String.valueOf(Calendar.getInstance().get(Calendar.MILLISECOND)) +
+		String.valueOf(Math.round(Math.random() * 100 + 1)));
 		Customer customer = new Customer(cid);
 		writeData(xid, customer.getKey(), customer);
 		Trace.info("RM::newCustomer(" + cid + ") returns ID=" + cid);

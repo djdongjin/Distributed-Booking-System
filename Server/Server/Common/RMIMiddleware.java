@@ -126,22 +126,6 @@ public class RMIMiddleware extends ResourceManager {
         super(name);
     }
 
-    public void timeoutDetect()
-    {
-        for (Integer xid : tm.activeTransaction()) {
-            if (!tm.checkTime(xid)) {
-                abort(xid);
-                System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
-                break;
-            }
-        }
-        try {
-            Thread.sleep(100);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     public void connectServer(String tp, String server, int port, String name)
     {
         try {
@@ -180,25 +164,6 @@ public class RMIMiddleware extends ResourceManager {
         }
     }
 
-    private void lockSomething(int xid, String key, TransactionLockObject.LockType lc) throws TransactionAbortedException, InvalidTransactionException
-    {
-        if (!tm.tranactionExist(xid))
-        {
-            throw new InvalidTransactionException(xid, "transaction not exist.");
-        }
-        tm.resetTime(xid);
-        try {
-            boolean yn = lm.Lock(xid, key, lc);
-            if (!yn)
-            {
-                abort(xid);
-                throw new TransactionAbortedException(xid, "lock is not granted.");
-            }
-        } catch (DeadlockException e) {
-            abort(xid);
-            throw new TransactionAbortedException(xid, "deadlock.");
-        }
-    }
     // Reserve an item
     protected boolean reserveItem(int xid, int customerID, String key, String location, IResourceManager rm) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
@@ -236,6 +201,42 @@ public class RMIMiddleware extends ResourceManager {
         }
     }
 
+    public int newCustomer(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        Trace.info("RM::newCustomer(" + xid + ") called");
+        // Generate a globally unique ID for the new customer
+        int cid = Integer.parseInt(String.valueOf(xid) +
+                String.valueOf(Calendar.getInstance().get(Calendar.MILLISECOND)) +
+                String.valueOf(Math.round(Math.random() * 100 + 1)));
+
+        lockSomething(xid, Customer.getKey(cid), TransactionLockObject.LockType.LOCK_WRITE);
+
+        Customer customer = new Customer(cid);
+        writeData(xid, customer.getKey(), customer);
+        Trace.info("RM::newCustomer(" + cid + ") returns ID=" + cid);
+        return cid;
+    }
+
+    public boolean newCustomer(int xid, int customerID) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_WRITE);
+
+        Trace.info("RM::newCustomer(" + xid + ", " + customerID + ") called");
+        Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
+        if (customer == null)
+        {
+            customer = new Customer(customerID);
+            writeData(xid, customer.getKey(), customer);
+            Trace.info("RM::newCustomer(" + xid + ", " + customerID + ") created a new customer");
+            return true;
+        }
+        else
+        {
+            Trace.info("INFO: RM::newCustomer(" + xid + ", " + customerID + ") failed--customer already exists");
+            return false;
+        }
+    }
+
     public boolean deleteCustomer(int xid, int customerID) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_WRITE);
@@ -261,25 +262,7 @@ public class RMIMiddleware extends ResourceManager {
             {
                 ReservedItem reserveditem = customer.getReservedItem(reservedKey);
                 Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey() + " " + reserveditem.getCount() +  " times");
-                IResourceManager rm = null;
-                switch (reservedKey.substring(0, 3))
-                {
-                    case "fli":
-                    {
-                        rm = flightRM;
-                        break;
-                    }
-                    case "car":
-                    {
-                        rm = carRM;
-                        break;
-                    }
-                    case "roo":
-                    {
-                        rm = roomRM;
-                        break;
-                    }
-                }
+                IResourceManager rm = givenKey(reservedKey);
                 int price = rm.modify(xid, reserveditem.getKey(), reserveditem.getCount());
                 Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey());
             }
@@ -288,6 +271,26 @@ public class RMIMiddleware extends ResourceManager {
             removeData(xid, customer.getKey());
             Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") succeeded");
             return true;
+        }
+    }
+
+    public String queryCustomerInfo(int xid, int customerID) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_READ);
+
+        Trace.info("RM::queryCustomerInfo(" + xid + ", " + customerID + ") called");
+        Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
+        if (customer == null)
+        {
+            Trace.warn("RM::queryCustomerInfo(" + xid + ", " + customerID + ") failed--customer doesn't exist");
+            // NOTE: don't change this--WC counts on this value indicating a customer does not exist...
+            return "";
+        }
+        else
+        {
+            Trace.info("RM::queryCustomerInfo(" + xid + ", " + customerID + ")");
+            System.out.println(customer.getBill());
+            return customer.getBill();
         }
     }
 
@@ -428,6 +431,46 @@ public class RMIMiddleware extends ResourceManager {
         return m_name;
     }
 
+    private void lockSomething(int xid, String key, TransactionLockObject.LockType lc) throws TransactionAbortedException, InvalidTransactionException
+    {
+        if (!tm.transactionExist(xid))
+        {
+            throw new InvalidTransactionException(xid, "transaction not exist.");
+        }
+        tm.resetTime(xid);
+        IResourceManager rm = givenKey(key);
+        if (rm != null) {
+            tm.addRM(xid, rm);
+        }
+        try {
+            boolean yn = lm.Lock(xid, key, lc);
+            if (!yn)
+            {
+                abort(xid);
+                throw new TransactionAbortedException(xid, "lock is not granted.");
+            }
+        } catch (DeadlockException e) {
+            abort(xid);
+            throw new TransactionAbortedException(xid, "deadlock.");
+        }
+    }
+
+    public void timeoutDetect()
+    {
+        for (Integer xid : tm.activeTransaction()) {
+            if (!tm.checkTime(xid)) {
+                abort(xid);
+                System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
+                break;
+            }
+        }
+        try {
+            Thread.sleep(100);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public int start()
     {
         return tm.start();
@@ -484,5 +527,29 @@ public class RMIMiddleware extends ResourceManager {
         }
         System.out.println("Middleware shut down successfully!");
         System.exit(1);
+    }
+
+    private IResourceManager givenKey(String key)
+    {
+        IResourceManager rm = null;
+        switch (key.substring(0, 3))
+        {
+            case "fli":
+            {
+                rm = flightRM;
+                break;
+            }
+            case "car":
+            {
+                rm = carRM;
+                break;
+            }
+            case "roo":
+            {
+                rm = roomRM;
+                break;
+            }
+        }
+        return rm;
     }
 }

@@ -31,6 +31,22 @@ public class TransactionManager {
         return num_transaction;
     }
 
+    public void addRM(int xid, IResourceManager rm)
+    {
+        Vector<IResourceManager> tmp = xid_rm.get(xid);
+        if (!tmp.contains(rm))
+        {
+            tmp.add(rm);
+            xid_rm.put(xid, tmp);
+        }
+//        try {
+//            for (IResourceManager xxx : tmp)
+//                System.out.print(xxx.getName());
+//        } catch (RemoteException e) {
+//            e.printStackTrace();
+//        }
+    }
+
     public boolean commit(int xid)
     {
         try {
@@ -69,7 +85,7 @@ public class TransactionManager {
         return true;
     }
 
-    public boolean tranactionExist(int xid)
+    public boolean transactionExist(int xid)
     {
         if (xid_rm.containsKey(xid))
             return true;
