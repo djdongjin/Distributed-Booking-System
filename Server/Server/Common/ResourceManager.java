@@ -57,6 +57,7 @@ public class ResourceManager implements IResourceManager
 				}
 			}
 			m_data.put(key, value);
+			origin_data.put(xid, xid_hashmap);
 		}
 	}
 
@@ -80,6 +81,7 @@ public class ResourceManager implements IResourceManager
 				}
 			}
 			m_data.remove(key);
+			origin_data.put(xid, xid_hashmap);
 		}
 	}
 
@@ -469,5 +471,15 @@ public class ResourceManager implements IResourceManager
 		}
 
 		return true;
+	}
+
+	public void shutdown()
+	{
+		try {
+			System.out.println(getName() + "shutdown successfully!");
+			System.exit(1);
+		} catch (RemoteException e) {
+			System.exit(1);
+		}
 	}
 }

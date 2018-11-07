@@ -222,4 +222,7 @@ public interface IResourceManager extends Remote
 
     public boolean abort(int id)
         throws RemoteException;
+
+    public void shutdown()
+        throws RemoteException;
 }

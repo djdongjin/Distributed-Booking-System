@@ -14,13 +14,13 @@ import java.rmi.UnmarshalException;
 public abstract class Client
 {
 	IResourceManager m_resourceManager = null;
-	Vector<Integer> xids = null;
+//	Vector<Integer> xids = null;
 
 
 	public Client()
 	{
 		super();
-		xids = new Vector<Integer>();
+//		xids = new Vector<Integer>();
 	}
 
 	public abstract void connectServer();
@@ -90,7 +90,7 @@ public abstract class Client
 				case Start: {
 					if (arguments.size() == 1) {
 						int id = m_resourceManager.start();
-						xids.add(id);
+//						xids.add(id);
 						System.out.println("Start a new transaction, transaction ID: " + id);
 					} else {
 						System.err.println((char) 27 + "[31;1mCommand exception: " + (char) 27 + "[0mImproper use of start command. Location \"start\"");
@@ -103,28 +103,18 @@ public abstract class Client
 					System.out.println("Commit a transaction [xid=" + arguments.elementAt(1) + "]");
 
 					int id = toInt(arguments.elementAt(1));
-					if (xids.contains(id)) {
-						m_resourceManager.commit(id);
-						xids.removeElement(id);
-						System.out.println("[" + id + "] commit Successfully.");
-					} else {
-						System.out.println("[" + id + "] commit unsuccessfully: no such a transaction!");
-					}
+					m_resourceManager.commit(id);
+					System.out.println("[" + id + "] commit Successfully.");
 					break;
 				}
 				case Abort: {
 					checkArgumentsCount(2, arguments.size());
 
 					System.out.println("Abort a transaction [xid=" + arguments.elementAt(1) + "]");
-					int id = toInt(arguments.elementAt(1));
 
-					if (xids.contains(id)) {
-						m_resourceManager.abort(id);
-						xids.removeElement(id);
-						System.out.println("[" + id + "] abort successfully.");
-					} else {
-						System.out.println("[" + id + "] abort unsuccessfully: no such a transaction!");
-					}
+					int id = toInt(arguments.elementAt(1));
+					m_resourceManager.abort(id);
+					System.out.println("[" + id + "] abort successfully.");
 					break;
 				}
 				case AddFlight: {
@@ -139,6 +129,11 @@ public abstract class Client
 					int flightNum = toInt(arguments.elementAt(2));
 					int flightSeats = toInt(arguments.elementAt(3));
 					int flightPrice = toInt(arguments.elementAt(4));
+
+					if (flightPrice < 0 || flightSeats < 0)
+					{
+						System.out.println("Flight could not be added: both flightSeats and flightPrice must be bigger than 0.");
+					}
 
 					if (m_resourceManager.addFlight(id, flightNum, flightSeats, flightPrice)) {
 						System.out.println("Flight added");
@@ -160,6 +155,11 @@ public abstract class Client
 					int numCars = toInt(arguments.elementAt(3));
 					int price = toInt(arguments.elementAt(4));
 
+					if (numCars < 0 || price < 0)
+					{
+						System.out.println("Cars could not be added: both flightSeats and flightPrice must be bigger than 0.");
+					}
+
 					if (m_resourceManager.addCars(id, location, numCars, price)) {
 						System.out.println("Cars added");
 					} else {
@@ -179,6 +179,11 @@ public abstract class Client
 					String location = arguments.elementAt(2);
 					int numRooms = toInt(arguments.elementAt(3));
 					int price = toInt(arguments.elementAt(4));
+
+					if (numRooms < 0 || price < 0)
+					{
+						System.out.println("Rooms could not be added: both flightSeats and flightPrice must be bigger than 0.");
+					}
 
 					if (m_resourceManager.addRooms(id, location, numRooms, price)) {
 						System.out.println("Rooms added");
@@ -454,6 +459,10 @@ public abstract class Client
 					}
 					break;
 				}
+				case ShutDown: {
+					m_resourceManager.shutdown();
+					System.out.println("You have shut down all servers.");
+				}
 				case Quit:
 					checkArgumentsCount(1, arguments.size());
 
@@ -463,17 +472,11 @@ public abstract class Client
 		}
 		catch (TransactionAbortedException e)
 		{
-			int id = e.getXId();
-			if (xids.contains(id))
-				xids.removeElement(id);
-			System.out.println("Transaction [" + id + "] is aborted.");
+			System.out.println("Transaction [" + e.getXId() + "] is aborted.");
 		}
 		catch (InvalidTransactionException e)
 		{
-			int id = e.getXId();
-			if (xids.contains(id))
-				xids.removeElement(id);
-			System.out.println("Transaction [" + id + "] doesn't exist.");
+			System.out.println("Transaction [" + e.getXId() + "] doesn't exist or has been aborted.");
 		}
 	}
 

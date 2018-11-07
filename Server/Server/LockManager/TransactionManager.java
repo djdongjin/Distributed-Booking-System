@@ -22,8 +22,12 @@ public class TransactionManager {
     public int start()
     {
         num_transaction ++;
-        xid_rm.put(num_transaction, new Vector<IResourceManager>());
-        xid_time.put(num_transaction, System.currentTimeMillis());
+        synchronized (xid_rm) {
+            xid_rm.put(num_transaction, new Vector<IResourceManager>());
+        }
+        synchronized (xid_time) {
+            xid_time.put(num_transaction, System.currentTimeMillis());
+        }
         return num_transaction;
     }
 
@@ -33,8 +37,12 @@ public class TransactionManager {
             for (IResourceManager rm : xid_rm.get(xid)) {
                 rm.commit(xid);
             }
-            xid_rm.remove(xid);
-            xid_time.remove(xid);
+            synchronized (xid_rm) {
+                xid_rm.remove(xid);
+            }
+            synchronized (xid_rm) {
+                xid_time.remove(xid);
+            }
             return true;
         } catch(RemoteException e) {
             e.printStackTrace();
@@ -48,8 +56,12 @@ public class TransactionManager {
             for (IResourceManager rm : xid_rm.get(xid)) {
                 rm.abort(xid);
             }
-            xid_time.remove(xid);
-            xid_rm.remove(xid);
+            synchronized (xid_rm) {
+                xid_time.remove(xid);
+            }
+            synchronized (xid_rm) {
+                xid_rm.remove(xid);
+            }
             return true;
         } catch(RemoteException e) {
             e.printStackTrace();
@@ -80,6 +92,8 @@ public class TransactionManager {
 
     public void resetTime(int xid)
     {
-        xid_time.put(xid, System.currentTimeMillis());
+        synchronized (xid_rm) {
+            xid_time.put(xid, System.currentTimeMillis());
+        }
     }
 }

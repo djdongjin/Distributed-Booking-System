@@ -186,6 +186,7 @@ public class RMIMiddleware extends ResourceManager {
         {
             throw new InvalidTransactionException(xid, "transaction not exist.");
         }
+        tm.resetTime(xid);
         try {
             boolean yn = lm.Lock(xid, key, lc);
             if (!yn)
@@ -203,6 +204,7 @@ public class RMIMiddleware extends ResourceManager {
     {
         lockSomething(xid, key, TransactionLockObject.LockType.LOCK_WRITE);
         lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_WRITE);
+
         Trace.info("RM::reserveItem(" + xid + ", customer=" + customerID + ", " + key + ", " + location + ") called" );
         // Read customer object if it exists (and read lock it)
         Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
@@ -237,6 +239,7 @@ public class RMIMiddleware extends ResourceManager {
     public boolean deleteCustomer(int xid, int customerID) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_WRITE);
+
         Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") called");
         Customer customer = (Customer)readData(xid, Customer.getKey(customerID));
         if (customer == null)
@@ -248,17 +251,37 @@ public class RMIMiddleware extends ResourceManager {
         {
             // Increase the reserved numbers of all reservable items which the customer reserved.
             RMHashMap reservations = customer.getReservations();
-            IResourceManager[] v = {flightRM, carRM, roomRM};
+            // Lock all reservedKey first
+            for (String reservedKey: reservations.keySet())
+            {
+                lockSomething(xid, reservedKey, TransactionLockObject.LockType.LOCK_WRITE);
+            }
+
             for (String reservedKey : reservations.keySet())
             {
                 ReservedItem reserveditem = customer.getReservedItem(reservedKey);
                 Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey() + " " + reserveditem.getCount() +  " times");
-                for (IResourceManager rm : v) {
-                    int price = rm.modify(xid, reserveditem.getKey(), reserveditem.getCount());
-                    if (price <= 0) continue;
-                    Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey());
-                    break;
+                IResourceManager rm = null;
+                switch (reservedKey.substring(0, 3))
+                {
+                    case "fli":
+                    {
+                        rm = flightRM;
+                        break;
+                    }
+                    case "car":
+                    {
+                        rm = carRM;
+                        break;
+                    }
+                    case "roo":
+                    {
+                        rm = roomRM;
+                        break;
+                    }
                 }
+                int price = rm.modify(xid, reserveditem.getKey(), reserveditem.getCount());
+                Trace.info("RM::deleteCustomer(" + xid + ", " + customerID + ") has reserved " + reserveditem.getKey());
             }
 
             // Remove the customer from the storage
@@ -268,7 +291,7 @@ public class RMIMiddleware extends ResourceManager {
         }
     }
 
-    public boolean addFlight(int xid, int flightNum, int flightSeats, int flightPrice) throws RemoteException, TransactionAbortedException, InvalidTransactionException, TransactionAbortedException
+    public boolean addFlight(int xid, int flightNum, int flightSeats, int flightPrice) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         lockSomething(xid, Flight.getKey(flightNum), TransactionLockObject.LockType.LOCK_WRITE);
         return flightRM.addFlight(xid, flightNum, flightSeats, flightPrice);
@@ -357,15 +380,25 @@ public class RMIMiddleware extends ResourceManager {
 
     public boolean bundle(int xid, int customerID, Vector<String> flightNum, String location, boolean car, boolean room) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
-        boolean yn_car = !car || carRM.queryCars(xid, location) > 0;
-        boolean yn_room = !room || roomRM.queryRooms(xid, location) > 0;
-
-        boolean yn_flight = true;
+        lockSomething(xid, Customer.getKey(customerID), TransactionLockObject.LockType.LOCK_WRITE);
         Vector<Integer> flightNum_int = new Vector<>();
         for (String num: flightNum)
         {
             int num_int = Integer.parseInt(num);
             flightNum_int.add(num_int);
+            lockSomething(xid, Flight.getKey(num_int), TransactionLockObject.LockType.LOCK_WRITE);
+        }
+        if (car)
+            lockSomething(xid, Car.getKey(location), TransactionLockObject.LockType.LOCK_WRITE);
+        if (room)
+            lockSomething(xid, Room.getKey(location), TransactionLockObject.LockType.LOCK_WRITE);
+
+        boolean yn_car = !car || carRM.queryCars(xid, location) > 0;
+        boolean yn_room = !room || roomRM.queryRooms(xid, location) > 0;
+
+        boolean yn_flight = true;
+        for (Integer num_int: flightNum_int)
+        {
             yn_flight = flightRM.queryFlight(xid, num_int) > 0;
             if (!yn_flight)
                 break;
@@ -400,33 +433,56 @@ public class RMIMiddleware extends ResourceManager {
         return tm.start();
     }
 
-    public boolean commit(int id)
+    public boolean commit(int xid)
     {
-        lm.UnlockAll(id);
-        origin_data.remove(id);
-        return tm.commit(id);
+        lm.UnlockAll(xid);
+        synchronized (origin_data) {
+            origin_data.remove(xid);
+        }
+        return tm.commit(xid);
     }
 
-    public boolean abort(int id)
+    public boolean abort(int xid)
     {
-        lm.UnlockAll(id);
-        RMHashMap data = origin_data.get(id);
-        if (data != null) {
-            for (String key : data.keySet()) {
-                if (data.get(key) == null) {
-                    synchronized (m_data) {
-                        m_data.remove(key);
-                    }
-                } else {
-                    synchronized (m_data) {
-                        m_data.put(key, data.get(key));
+        lm.UnlockAll(xid);
+        synchronized (origin_data) {
+            RMHashMap data = origin_data.get(xid);
+            if (data != null) {
+                for (String key : data.keySet()) {
+                    if (data.get(key) == null) {
+                        synchronized (m_data) {
+                            m_data.remove(key);
+                        }
+                    } else {
+                        synchronized (m_data) {
+                            m_data.put(key, data.get(key));
+                        }
                     }
                 }
+                origin_data.remove(xid);
             }
-            origin_data.remove(id);
         }
-
-        return tm.abort(id);
+        return tm.abort(xid);
     }
 
+    public void shutdown()
+    {
+        try {
+            flightRM.shutdown();
+        } catch (RemoteException e) {
+            System.out.println("Flight RM shut down successfully!");
+        }
+        try {
+            roomRM.shutdown();
+        } catch (RemoteException e) {
+            System.out.println("Room RM shut down successfully!");
+        }
+        try {
+            carRM.shutdown();
+        } catch (RemoteException e) {
+            System.out.println("Car RM shut down successfully!");
+        }
+        System.out.println("Middleware shut down successfully!");
+        System.exit(1);
+    }
 }

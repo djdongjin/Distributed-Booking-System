@@ -64,6 +64,10 @@ public class LockManager
 
 						if (bConvert.get(0) == true) {
 							//TODO: Lock conversion
+							TransactionLockObject readXLockObject = new TransactionLockObject(xid, data, TransactionLockObject.LockType.LOCK_READ);
+							DataLockObject readDataLockObject = new DataLockObject(xid, data, TransactionLockObject.LockType.LOCK_READ);
+							this.lockTable.remove(readXLockObject);
+							this.lockTable.remove(readDataLockObject);
 							this.lockTable.add(xLockObject);
 							this.lockTable.add(dataLockObject);
 							Trace.info("LM::lock(" + xid + ", " + data + ", " + lockType + ") converted");
@@ -244,9 +248,6 @@ public class LockManager
 							}
 						}
 						// no others has lock, can grant WRITE and remove its READ
-						this.lockTable.remove(l_dataLockObject);
-						TransactionLockObject l_transactionLockObject = new TransactionLockObject(l_dataLockObject.getXId(), l_dataLockObject.getDataName(), l_dataLockObject.getLockType());
-						this.lockTable.remove(l_transactionLockObject);
 						bitset.set(0, true);
 						return false;
 					}
@@ -342,7 +343,6 @@ public class LockManager
 			}
 		}
 	}
-
 
 	// CleanupDeadlock cleans up stampTable and waitTable, and throws DeadlockException
 	private void cleanupDeadlock(TimeObject timeObject, WaitLockObject waitLockObject) throws DeadlockException

@@ -36,6 +36,7 @@ public enum Command {
 
 	Analytics("Report the item with quantity lower than the threshold", "<xid>,<item>,<quantity>"),
 
+	ShutDown("Shut down all servers", ""),
 	Quit("Exit the client application", "");
 
 	String m_description;
