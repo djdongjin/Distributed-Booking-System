@@ -100,6 +100,7 @@ public class RMIMiddleware extends ResourceManager {
                     }
                 }
             });
+            time_to_live.start();
 
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 public void run() {

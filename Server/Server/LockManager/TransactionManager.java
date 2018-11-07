@@ -10,7 +10,7 @@ public class TransactionManager {
     private Hashtable<Integer, Vector<IResourceManager>> xid_rm;
     private Hashtable<Integer, Long> xid_time;
     private static int num_transaction = 0;
-    private static long MAX_EXIST_TIME = 10000;
+    private static long MAX_EXIST_TIME = 100000;
 
 
     public TransactionManager()
@@ -95,11 +95,17 @@ public class TransactionManager {
 
     public Set<Integer> activeTransaction()
     {
+//        for (Integer s: xid_time.keySet())
+//        {
+//            System.out.print(s);
+//        }
+//        System.out.println();
         return xid_time.keySet();
     }
 
     public boolean checkTime(int xid)
     {
+//        System.out.println(xid_time.get(xid));
         if (System.currentTimeMillis() - xid_time.get(xid) > MAX_EXIST_TIME)
             return false;
         else
@@ -108,7 +114,7 @@ public class TransactionManager {
 
     public void resetTime(int xid)
     {
-        synchronized (xid_rm) {
+        synchronized (xid_time) {
             xid_time.put(xid, System.currentTimeMillis());
         }
     }
