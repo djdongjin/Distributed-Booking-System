@@ -1,3 +1,0 @@
-grant codebase "file:/Users/dongjin/code/COMP512/pj1/client/" {
-	permission java.security.AllPermission;
-};

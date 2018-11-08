@@ -34,5 +34,5 @@ compile-server-tcp: ../Client/Command.jar Server/TCP/*.java Server/Interface/IRe
 
 clean:
 	rm -f Server/Interface/*.class Server/Common/*.class Server/RMI/*.class Server/LockManager/*.class
-	rm -f RMIInterface.jar
+	rm -f *.jar
 	rm -f java.policy

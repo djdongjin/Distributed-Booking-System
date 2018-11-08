@@ -31,8 +31,10 @@ public class AutoClient extends Client {
     private static int iterationNum = 100;
     private long startTime, endTime;
     private Vector<Long> responseTime = new Vector<Long>();
-    private Vector<Long> queryTime = new Vector<Long>();
-    private Vector<Long> reserveTime = new Vector<Long>();
+    private Vector<Float> initTime = new Vector<Float>();
+    private Vector<Float> queryTime = new Vector<Float>();
+    private Vector<Float> reserveTime = new Vector<Float>();
+    private Vector<Float> commitTime = new Vector<Float>();
     private Vector<Long> txTime = new Vector<Long>();
     private Random rand = new Random();
 
@@ -162,38 +164,61 @@ public class AutoClient extends Client {
                         System.out.println("itinerary failed");
                         return;
                     } else {
-                        queryTime.add(
-                                (responseTime.get(0) + responseTime.get(1) + responseTime.get(3) + responseTime.get(5))
-                                        / 4);
-                        reserveTime.add((responseTime.get(2) + responseTime.get(4) + responseTime.get(6)) / 3);
+                        initTime.add((float) responseTime.get(0));
+                        queryTime.add((float) ((responseTime.get(1) + responseTime.get(2) + responseTime.get(4)
+                                + responseTime.get(6)) / 4));
+                        reserveTime
+                                .add((float) ((responseTime.get(3) + responseTime.get(5) + responseTime.get(7)) / 3));
+                        commitTime.add((float) responseTime.get(8));
                     }
                 }
 
-                float avgQueryTime = 0, avgReserveTime = 0, avgTxTime = 0;
+                System.out.println("itinerary finished");
+
+                float avgInitTime = 0, avgQueryTime = 0, avgReserveTime = 0, avgCommitTime = 0, avgTxTime = 0;
                 for (int i = 0; i < iterationNum; i++) {
+                    avgInitTime += initTime.get(i);
                     avgQueryTime += queryTime.get(i);
                     avgReserveTime += reserveTime.get(i);
+                    avgCommitTime += commitTime.get(i);
                     avgTxTime += txTime.get(i);
                 }
+                avgInitTime /= iterationNum;
                 avgQueryTime /= iterationNum;
                 avgReserveTime /= iterationNum;
+                avgCommitTime /= iterationNum;
                 avgTxTime /= iterationNum;
 
+                System.out.println("start time for every itinerary are: ");
+                for (float time : initTime) {
+                    System.out.print(Float.toString(time) + " ");
+                }
+                System.out.println();
                 System.out.println("query time for every itinerary are: ");
-                for (long time : queryTime) {
-                    System.out.print(Long.toString(time) + " ");
+                for (float time : queryTime) {
+                    System.out.print(Float.toString(time) + " ");
                 }
+                System.out.println();
                 System.out.println("reserve time for every itinerary are: ");
-                for (long time : reserveTime) {
-                    System.out.print(Long.toString(time) + " ");
+                for (float time : reserveTime) {
+                    System.out.print(Float.toString(time) + " ");
                 }
+                System.out.println();
+                System.out.println("commit time for every itinerary are: ");
+                for (float time : commitTime) {
+                    System.out.print(Float.toString(time) + " ");
+                }
+                System.out.println();
                 System.out.println("transaction time for every itinerary are: ");
                 for (long time : txTime) {
                     System.out.print(Long.toString(time) + " ");
                 }
+                System.out.println();
 
+                System.out.println("average start time: " + Float.toString(avgInitTime));
                 System.out.println("average query time: " + Float.toString(avgQueryTime));
                 System.out.println("average reserve time: " + Float.toString(avgReserveTime));
+                System.out.println("average commit time: " + Float.toString(avgCommitTime));
                 System.out.println("average transaction time: " + Float.toString(avgTxTime));
 
             } else {
@@ -222,10 +247,12 @@ public class AutoClient extends Client {
                         System.out.println("itinerary failed");
                         return;
                     } else {
-                        queryTime.add(
-                                (responseTime.get(0) + reserveTime.get(1) + responseTime.get(3) + responseTime.get(5))
-                                        / 4);
-                        reserveTime.add((reserveTime.get(2) + reserveTime.get(4) + reserveTime.get(6)) / 3);
+                        initTime.add((float) responseTime.get(0));
+                        queryTime.add((float) ((responseTime.get(1) + responseTime.get(2) + responseTime.get(4)
+                                + responseTime.get(6)) / 4));
+                        reserveTime
+                                .add((float) ((responseTime.get(3) + responseTime.get(5) + responseTime.get(7)) / 3));
+                        commitTime.add((float) responseTime.get(8));
                     }
 
                     endTime = System.currentTimeMillis();
@@ -235,31 +262,52 @@ public class AutoClient extends Client {
                     }
                 }
 
-                float avgQueryTime = 0, avgReserveTime = 0, avgTxTime = 0;
+                System.out.println("itinerary finished");
+
+                float avgInitTime = 0, avgQueryTime = 0, avgReserveTime = 0, avgCommitTime = 0, avgTxTime = 0;
                 for (int i = 0; i < iterationNum; i++) {
+                    avgInitTime += initTime.get(i);
                     avgQueryTime += queryTime.get(i);
                     avgReserveTime += reserveTime.get(i);
+                    avgCommitTime += commitTime.get(i);
                     avgTxTime += txTime.get(i);
                 }
+                avgInitTime /= iterationNum;
                 avgQueryTime /= iterationNum;
                 avgReserveTime /= iterationNum;
+                avgCommitTime /= iterationNum;
                 avgTxTime /= iterationNum;
 
+                System.out.println("start time for every itinerary are: ");
+                for (float time : initTime) {
+                    System.out.print(Float.toString(time) + " ");
+                }
+                System.out.println();
                 System.out.println("query time for every itinerary are: ");
-                for (long time : queryTime) {
-                    System.out.print(Long.toString(time) + " ");
+                for (float time : queryTime) {
+                    System.out.print(Float.toString(time) + " ");
                 }
+                System.out.println();
                 System.out.println("reserve time for every itinerary are: ");
-                for (long time : reserveTime) {
-                    System.out.print(Long.toString(time) + " ");
+                for (float time : reserveTime) {
+                    System.out.print(Float.toString(time) + " ");
                 }
+                System.out.println();
+                System.out.println("commit time for every itinerary are: ");
+                for (float time : commitTime) {
+                    System.out.print(Float.toString(time) + " ");
+                }
+                System.out.println();
                 System.out.println("transaction time for every itinerary are: ");
                 for (long time : txTime) {
                     System.out.print(Long.toString(time) + " ");
                 }
+                System.out.println();
 
+                System.out.println("average start time: " + Float.toString(avgInitTime));
                 System.out.println("average query time: " + Float.toString(avgQueryTime));
                 System.out.println("average reserve time: " + Float.toString(avgReserveTime));
+                System.out.println("average commit time: " + Float.toString(avgCommitTime));
                 System.out.println("average transaction time: " + Float.toString(avgTxTime));
             }
 
@@ -319,7 +367,9 @@ public class AutoClient extends Client {
         Vector<Long> responseTime = new Vector<Long>();
         long startTime;
 
+        startTime = System.currentTimeMillis();
         int xid = m_resourceManager.start();
+        responseTime.add(System.currentTimeMillis() - startTime);
 
         startTime = System.currentTimeMillis();
         m_resourceManager.queryCustomerInfo(xid, customerID);
@@ -408,8 +458,9 @@ public class AutoClient extends Client {
             }
         }
 
+        startTime = System.currentTimeMillis();
         m_resourceManager.commit(xid);
-        System.out.println("itinerary finished");
+        responseTime.add(System.currentTimeMillis() - startTime);
         return responseTime;
     }
 
