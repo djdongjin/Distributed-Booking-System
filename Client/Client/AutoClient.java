@@ -20,13 +20,16 @@ public class AutoClient extends Client {
 
     public enum City {
         YUL, YYZ, YOW, YVR, YQB, JFK, EWR, LGA, BOS, PHL, IAD, ATL, MIA, IAH, MDW, ORD, DTW, SEA, SFO, LAX, PEK, PVG,
-        SHA, CAN, HKG;
+        SHA, CAN, HKG, AAA, AAB, AAC, AAD, AAE, AAF, AAG, AAH, AAI, AAJ, AAK, AAL, AAM, AAN, AAO, AAP, AAQ, AAR, AAS,
+        AAT, AAU, AAV, AAW, AAX, AAY, AAZ, ABA, ABB, ABC, ABD, ABE, ABF, ABG, ABH, ABI, ABJ, ABK, ABL, ABM, ABN, ABO,
+        ABP, ABQ, ABR, ABS, ABT, ABU, ABV, ABW, ABX, ABY, ABZ, ACA, ACB, ACC, ACD, ACE, ACF, ACG, ACH, ACI, ACJ, ACK,
+        ACL, ACM, ACN, ACO, ACP, ACQ, ACR, ACS, ACT, ACU, ACV, ACW
     }
 
     IResourceManager m_resourceManager = null;
     Vector<Integer> xids = null;
 
-    private static int CustomerNum = 10;
+    private static int CustomerNum = 200;
     private static int CityNum = City.values().length;
     private static int iterationNum = 100;
     private long startTime, endTime;
@@ -134,35 +137,49 @@ public class AutoClient extends Client {
 
     public void start(boolean multiMachine, boolean multiRM, long txInterval, int clientNum) {
         // Prepare for reading commands
-        System.out.println();
-        System.out.println("press any key to start...");
 
-        try {
-            BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
-            stdin.readLine();
-        } catch (IOException io) {
-            System.err.println((char) 27 + "[31;1mClient exception: " + (char) 27 + "[0m" + io.getLocalizedMessage());
-            io.printStackTrace();
-            System.exit(1);
-        }
-
-        try {
-            if (!multiMachine) {
-
+        if (!multiMachine || clientNum == 1) {
+            try {
                 if (!preparation()) {
                     System.out.println("preparation failed, exit");
                     return;
                 }
 
+                System.out.println("preparation finished");
+                System.out.println("press any key to start...");
+                BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+                stdin.readLine();
+            } catch (TransactionAbortedException e) {
+                int id = e.getXId();
+                if (xids.contains(id))
+                    xids.removeElement(id);
+                System.out.println("Transaction [" + id + "] is aborted.");
+            } catch (InvalidTransactionException e) {
+                int id = e.getXId();
+                if (xids.contains(id))
+                    xids.removeElement(id);
+                System.out.println("Transaction [" + id + "] doesn't exist.");
+            } catch (RemoteException e) {
+                System.out.println("Remote exception");
+                System.exit(1);
+            } catch (IOException io) {
+                System.err
+                        .println((char) 27 + "[31;1mClient exception: " + (char) 27 + "[0m" + io.getLocalizedMessage());
+                io.printStackTrace();
+                System.exit(1);
+            }
+        }
+
+        try {
+            if (!multiMachine) {
                 System.out.println("begin to test...");
                 for (int i = 0; i < iterationNum; i++) {
                     startTime = System.currentTimeMillis();
                     responseTime = itinerary(multiRM, 10000 + i % CustomerNum, 100 + i % CityNum,
                             City.values()[i % CityNum].name());
                     txTime.add(System.currentTimeMillis() - startTime);
-                    if (responseTime.size() == 1) {
+                    if (responseTime.size() < 9) {
                         System.out.println("itinerary failed");
-                        return;
                     } else {
                         initTime.add((float) responseTime.get(0));
                         queryTime.add((float) ((responseTime.get(1) + responseTime.get(2) + responseTime.get(4)
@@ -176,18 +193,23 @@ public class AutoClient extends Client {
                 System.out.println("itinerary finished");
 
                 float avgInitTime = 0, avgQueryTime = 0, avgReserveTime = 0, avgCommitTime = 0, avgTxTime = 0;
-                for (int i = 0; i < iterationNum; i++) {
+                int successTimes = initTime.size();
+
+                for (int i = (int) (0.2 * successTimes) - 1; i < successTimes; i++) {
                     avgInitTime += initTime.get(i);
                     avgQueryTime += queryTime.get(i);
                     avgReserveTime += reserveTime.get(i);
                     avgCommitTime += commitTime.get(i);
+                }
+                avgInitTime /= (successTimes * 0.8);
+                avgQueryTime /= (successTimes * 0.8);
+                avgReserveTime /= (successTimes * 0.8);
+                avgCommitTime /= (successTimes * 0.8);
+
+                for (int i = (int) (0.2 * iterationNum) - 1; i < iterationNum; i++) {
                     avgTxTime += txTime.get(i);
                 }
-                avgInitTime /= iterationNum;
-                avgQueryTime /= iterationNum;
-                avgReserveTime /= iterationNum;
-                avgCommitTime /= iterationNum;
-                avgTxTime /= iterationNum;
+                avgTxTime /= (iterationNum * 0.8);
 
                 System.out.println("start time for every itinerary are: ");
                 for (float time : initTime) {
@@ -222,30 +244,18 @@ public class AutoClient extends Client {
                 System.out.println("average transaction time: " + Float.toString(avgTxTime));
 
             } else {
-                if (clientNum == 1) {
-                    startTime = System.currentTimeMillis();
-                    if (!preparation()) {
-                        System.out.println("preparation failed, exit");
-                        return;
-                    }
-
-                    endTime = System.currentTimeMillis();
-                    if (endTime - startTime < 5000) {
-                        Thread.sleep(5000 + startTime - endTime);
-                    }
-                } else {
-                    Thread.sleep(5000);
+                while (System.currentTimeMillis() % 10000 >= 10) {
                 }
+                // Thread.sleep(5000);
 
                 System.out.println("begin to test...");
                 for (int i = 0; i < iterationNum; i++) {
                     startTime = System.currentTimeMillis();
-                    responseTime = itinerary(true, 10000 + (i * clientNum) % CustomerNum,
-                            100 + (i * clientNum) % CityNum, City.values()[(i * clientNum) % CityNum].name());
+                    responseTime = itinerary(true, 10000 + (i * 8 + clientNum) % CustomerNum,
+                            100 + (i * 8 + clientNum) % CityNum, City.values()[(i * 8 + clientNum) % CityNum].name());
                     txTime.add(System.currentTimeMillis() - startTime);
-                    if (reserveTime.size() == 1) {
+                    if (responseTime.size() < 9) {
                         System.out.println("itinerary failed");
-                        return;
                     } else {
                         initTime.add((float) responseTime.get(0));
                         queryTime.add((float) ((responseTime.get(1) + responseTime.get(2) + responseTime.get(4)
@@ -257,26 +267,35 @@ public class AutoClient extends Client {
 
                     endTime = System.currentTimeMillis();
                     if (endTime - startTime < txInterval) {
-                        long noise = (long) (rand.nextInt((int) (txInterval / 10) + 1) - (txInterval / 20));
-                        Thread.sleep(txInterval + startTime - endTime + noise);
+                        int noise = rand.nextInt((int) (txInterval / 50) + 1) - (int) (txInterval / 100);
+                        int sleepTime = (int) (txInterval + startTime - endTime) + noise;
+                        Thread.sleep(sleepTime);
+                    } else {
+                        System.out.println("execute time is too long" + Long.toString(endTime - startTime));
                     }
+
                 }
 
                 System.out.println("itinerary finished");
 
                 float avgInitTime = 0, avgQueryTime = 0, avgReserveTime = 0, avgCommitTime = 0, avgTxTime = 0;
-                for (int i = 0; i < iterationNum; i++) {
+                int successTimes = initTime.size();
+
+                for (int i = (int) (0.2 * successTimes) - 1; i < successTimes; i++) {
                     avgInitTime += initTime.get(i);
                     avgQueryTime += queryTime.get(i);
                     avgReserveTime += reserveTime.get(i);
                     avgCommitTime += commitTime.get(i);
+                }
+                avgInitTime /= (successTimes * 0.8);
+                avgQueryTime /= (successTimes * 0.8);
+                avgReserveTime /= (successTimes * 0.8);
+                avgCommitTime /= (successTimes * 0.8);
+
+                for (int i = (int) (0.2 * iterationNum) - 1; i < iterationNum; i++) {
                     avgTxTime += txTime.get(i);
                 }
-                avgInitTime /= iterationNum;
-                avgQueryTime /= iterationNum;
-                avgReserveTime /= iterationNum;
-                avgCommitTime /= iterationNum;
-                avgTxTime /= iterationNum;
+                avgTxTime /= (iterationNum * 0.8);
 
                 System.out.println("start time for every itinerary are: ");
                 for (float time : initTime) {
@@ -310,20 +329,6 @@ public class AutoClient extends Client {
                 System.out.println("average commit time: " + Float.toString(avgCommitTime));
                 System.out.println("average transaction time: " + Float.toString(avgTxTime));
             }
-
-        } catch (TransactionAbortedException e) {
-            int id = e.getXId();
-            if (xids.contains(id))
-                xids.removeElement(id);
-            System.out.println("Transaction [" + id + "] is aborted.");
-        } catch (InvalidTransactionException e) {
-            int id = e.getXId();
-            if (xids.contains(id))
-                xids.removeElement(id);
-            System.out.println("Transaction [" + id + "] doesn't exist.");
-        } catch (RemoteException e) {
-            System.out.println("Remote exception");
-            System.exit(1);
         } catch (InterruptedException e) {
             System.out.println("Sleep interrupted");
             System.exit(1);
@@ -362,20 +367,41 @@ public class AutoClient extends Client {
         return true;
     }
 
-    public Vector<Long> itinerary(boolean multiRM, int customerID, int flightNum, String location)
-            throws RemoteException, TransactionAbortedException, InvalidTransactionException {
+    public Vector<Long> itinerary(boolean multiRM, int customerID, int flightNum, String location) {
         Vector<Long> responseTime = new Vector<Long>();
         long startTime;
 
-        startTime = System.currentTimeMillis();
-        int xid = m_resourceManager.start();
-        responseTime.add(System.currentTimeMillis() - startTime);
+        try {
+            startTime = System.currentTimeMillis();
+            int xid = m_resourceManager.start();
+            responseTime.add(System.currentTimeMillis() - startTime);
 
-        startTime = System.currentTimeMillis();
-        m_resourceManager.queryCustomerInfo(xid, customerID);
-        responseTime.add(System.currentTimeMillis() - startTime);
-        if (!multiRM) {
-            for (int i = 0; i < 3; i++) {
+            startTime = System.currentTimeMillis();
+            m_resourceManager.queryCustomerInfo(xid, customerID);
+            responseTime.add(System.currentTimeMillis() - startTime);
+            if (!multiRM) {
+                for (int i = 0; i < 3; i++) {
+                    startTime = System.currentTimeMillis();
+                    int seatNum = m_resourceManager.queryFlight(xid, flightNum);
+                    responseTime.add(System.currentTimeMillis() - startTime);
+                    if (seatNum > 0) {
+                        startTime = System.currentTimeMillis();
+                        boolean reserveRes = m_resourceManager.reserveFlight(xid, customerID, flightNum);
+                        responseTime.add(System.currentTimeMillis() - startTime);
+                        if (!reserveRes) {
+                            m_resourceManager.abort(xid);
+                            System.out.println("failed to reserve flight " + Integer.toString(flightNum)
+                                    + " in transaction " + Integer.toString(xid));
+                            return new Vector<Long>();
+                        }
+                    } else {
+                        m_resourceManager.abort(xid);
+                        System.out.println("failed to reserve flight " + Integer.toString(flightNum)
+                                + " in transaction " + Integer.toString(xid) + ", not enough seats");
+                        return new Vector<Long>();
+                    }
+                }
+            } else {
                 startTime = System.currentTimeMillis();
                 int seatNum = m_resourceManager.queryFlight(xid, flightNum);
                 responseTime.add(System.currentTimeMillis() - startTime);
@@ -387,81 +413,73 @@ public class AutoClient extends Client {
                         m_resourceManager.abort(xid);
                         System.out.println("failed to reserve flight " + Integer.toString(flightNum)
                                 + " in transaction " + Integer.toString(xid));
-                        return new Vector<Long>(-1);
+                        return new Vector<Long>();
                     }
                 } else {
                     m_resourceManager.abort(xid);
                     System.out.println("failed to reserve flight " + Integer.toString(flightNum) + " in transaction "
                             + Integer.toString(xid) + ", not enough seats");
-                    return new Vector<Long>(-1);
+                    return new Vector<Long>();
                 }
-            }
-        } else {
-            startTime = System.currentTimeMillis();
-            int seatNum = m_resourceManager.queryFlight(xid, flightNum);
-            responseTime.add(System.currentTimeMillis() - startTime);
-            if (seatNum > 0) {
+
                 startTime = System.currentTimeMillis();
-                boolean reserveRes = m_resourceManager.reserveFlight(xid, customerID, flightNum);
+                int carNum = m_resourceManager.queryCars(xid, location);
                 responseTime.add(System.currentTimeMillis() - startTime);
-                if (!reserveRes) {
+                if (carNum > 0) {
+                    startTime = System.currentTimeMillis();
+                    boolean reserveRes = m_resourceManager.reserveCar(xid, customerID, location);
+                    responseTime.add(System.currentTimeMillis() - startTime);
+                    if (!reserveRes) {
+                        m_resourceManager.abort(xid);
+                        System.out.println(
+                                "failed to reserve car in " + location + " in transaction " + Integer.toString(xid));
+                        return new Vector<Long>();
+                    }
+                } else {
                     m_resourceManager.abort(xid);
-                    System.out.println("failed to reserve flight " + Integer.toString(flightNum) + " in transaction "
-                            + Integer.toString(xid));
-                    return new Vector<Long>(-1);
+                    System.out.println("failed to reserve car in " + location + " in transaction "
+                            + Integer.toString(xid) + ", not enough cars");
+                    return new Vector<Long>();
                 }
-            } else {
-                m_resourceManager.abort(xid);
-                System.out.println("failed to reserve flight " + Integer.toString(flightNum) + " in transaction "
-                        + Integer.toString(xid) + ", not enough seats");
-                return new Vector<Long>(-1);
+
+                startTime = System.currentTimeMillis();
+                int RoomNum = m_resourceManager.queryRooms(xid, location);
+                responseTime.add(System.currentTimeMillis() - startTime);
+                if (RoomNum > 0) {
+                    startTime = System.currentTimeMillis();
+                    boolean reserveRes = m_resourceManager.reserveRoom(xid, customerID, location);
+                    responseTime.add(System.currentTimeMillis() - startTime);
+                    if (!reserveRes) {
+                        m_resourceManager.abort(xid);
+                        System.out.println(
+                                "failed to reserve room in " + location + " in transaction " + Integer.toString(xid));
+                        return new Vector<Long>();
+                    }
+                } else {
+                    m_resourceManager.abort(xid);
+                    System.out.println("failed to reserve room in " + location + " in transaction "
+                            + Integer.toString(xid) + ", not enough seats");
+                    return new Vector<Long>();
+                }
             }
 
             startTime = System.currentTimeMillis();
-            int carNum = m_resourceManager.queryCars(xid, location);
+            m_resourceManager.commit(xid);
             responseTime.add(System.currentTimeMillis() - startTime);
-            if (carNum > 0) {
-                startTime = System.currentTimeMillis();
-                boolean reserveRes = m_resourceManager.reserveCar(xid, customerID, location);
-                responseTime.add(System.currentTimeMillis() - startTime);
-                if (!reserveRes) {
-                    m_resourceManager.abort(xid);
-                    System.out.println(
-                            "failed to reserve car in " + location + " in transaction " + Integer.toString(xid));
-                    return new Vector<Long>(-1);
-                }
-            } else {
-                m_resourceManager.abort(xid);
-                System.out.println("failed to reserve car in " + location + " in transaction " + Integer.toString(xid)
-                        + ", not enough cars");
-                return new Vector<Long>(-1);
-            }
-
-            startTime = System.currentTimeMillis();
-            int RoomNum = m_resourceManager.queryRooms(xid, location);
-            responseTime.add(System.currentTimeMillis() - startTime);
-            if (RoomNum > 0) {
-                startTime = System.currentTimeMillis();
-                boolean reserveRes = m_resourceManager.reserveRoom(xid, customerID, location);
-                responseTime.add(System.currentTimeMillis() - startTime);
-                if (!reserveRes) {
-                    m_resourceManager.abort(xid);
-                    System.out.println(
-                            "failed to reserve room in " + location + " in transaction " + Integer.toString(xid));
-                    return new Vector<Long>(-1);
-                }
-            } else {
-                m_resourceManager.abort(xid);
-                System.out.println("failed to reserve room in " + location + " in transaction " + Integer.toString(xid)
-                        + ", not enough seats");
-                return new Vector<Long>(-1);
-            }
+            return responseTime;
+        } catch (RemoteException e) {
+            System.out.println("remote exception: " + e.getMessage());
+            return new Vector<Long>();
+        } catch (TransactionAbortedException e) {
+            System.out.println("transaction [" + Integer.toString(e.getXId()) + "] abort: " + e.getMessage());
+            return new Vector<Long>();
+        } catch (InvalidTransactionException e) {
+            System.out.println("invalid transaction [" + Integer.toString(e.getXId()) + "]: " + e.getMessage());
+            return new Vector<Long>();
+        } catch (Exception e) {
+            System.out.println("abnormal transaction: " + e.getMessage());
+            return new Vector<Long>();
         }
-
-        startTime = System.currentTimeMillis();
-        m_resourceManager.commit(xid);
-        responseTime.add(System.currentTimeMillis() - startTime);
-        return responseTime;
     }
 
 }
