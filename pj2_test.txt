@@ -13,7 +13,7 @@ bundle, 2, 111, 1000, 2000, 3000, mtl, true, true
 commit, 2
 start
 bundle, 3, 111, 1000, 2000, 3000, mtl, true, true
-abort
+abort,3
 start
 querycustomer,4,111
 queryflight,4,1000
