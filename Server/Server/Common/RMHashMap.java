@@ -5,6 +5,7 @@
 
 package Server.Common;
 
+import java.io.Serializable;
 import java.util.*;
 
 // A specialization of HashMap with some extra diagnostics

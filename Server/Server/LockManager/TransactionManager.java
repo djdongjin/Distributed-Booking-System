@@ -1,5 +1,6 @@
 package Server.LockManager;
 
+import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.Set;
 import java.util.Vector;
@@ -45,6 +46,34 @@ public class TransactionManager {
 //        } catch (RemoteException e) {
 //            e.printStackTrace();
 //        }
+    }
+
+    public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        Vector<IResourceManager> vote = new Vector<>();
+        boolean final_res = true;
+        try {
+            // send VOTE-REQ request
+            // TODO: may timeout when waiting for all votes
+            for (IResourceManager rm : xid_rm.get(xid)) {
+                boolean res = rm.twoPC(xid);
+                if (res)
+                    vote.add(rm);
+                final_res &= res;
+            }
+            // if all vote YES, commit RM and return true(commit locally)
+            if (final_res) {
+                commit(xid);
+                return true;
+            } else {
+            // if someone votes NO, abort RM and return false(commit locally)
+                abort(xid);
+                return false;
+            }
+        } catch(RemoteException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     public boolean commit(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
@@ -118,4 +147,26 @@ public class TransactionManager {
             xid_time.put(xid, System.currentTimeMillis());
         }
     }
+
+    public Hashtable<Integer, Vector<IResourceManager>> getRMTable()
+    {
+        return xid_rm;
+    }
+
+    public void setRMTable(Hashtable<Integer, Vector<IResourceManager>> xidrm)
+    {
+        xid_rm = xidrm;
+    }
+
+    public Hashtable<Integer, Long> getTimeTable()
+    {
+        return xid_time;
+    }
+
+    public void setTimeTable(Hashtable<Integer, Long> xidtime)
+    {
+        xid_time = xidtime;
+    }
+
+
 }

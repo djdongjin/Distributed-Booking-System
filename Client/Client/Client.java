@@ -103,8 +103,13 @@ public abstract class Client
 					System.out.println("Commit a transaction [xid=" + arguments.elementAt(1) + "]");
 
 					int id = toInt(arguments.elementAt(1));
-					m_resourceManager.commit(id);
-					System.out.println("[" + id + "] commit Successfully.");
+//					m_resourceManager.commit(id);
+//					System.out.println("[" + id + "] commit Successfully.");
+					boolean yn = m_resourceManager.twoPC(id);
+					if (yn)
+						System.out.println("[" + id + "] commit Succeed.");
+					else
+						System.out.println("[" + id + "] commit Fail, and has been aborted.");
 					break;
 				}
 				case Abort: {

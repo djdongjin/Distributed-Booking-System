@@ -356,4 +356,20 @@ public class LockManager
 		}
 		throw new DeadlockException(waitLockObject.getXId(), "Sleep timeout: deadlocked");
 	}
+
+	public Vector<TPHashTable> getTables()
+	{
+		Vector<TPHashTable> ret = new Vector<>();
+		ret.add(lockTable);
+		ret.add(stampTable);
+		ret.add(waitTable);
+		return ret;
+	}
+
+	public void setTables(Vector<TPHashTable> tbs)
+	{
+		lockTable = tbs.get(0);
+		stampTable = tbs.get(1);
+		waitTable = tbs.get(2);
+	}
 }

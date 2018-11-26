@@ -3,6 +3,7 @@ package Server.Common;
 import Server.Interface.*;
 import Server.LockManager.*;
 
+import java.io.*;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
@@ -484,21 +485,8 @@ public class RMIMiddleware extends ResourceManager {
             throw new InvalidTransactionException(xid, "transaction not exist.");
         }
         lm.UnlockAll(xid);
-        synchronized (origin_data) {
-            origin_data.remove(xid);
-        }
-        return tm.commit(xid);
-    }
-
-    public boolean abort(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
-    {
-        if (!tm.transactionExist(xid))
-        {
-            throw new InvalidTransactionException(xid, "transaction not exist.");
-        }
-        lm.UnlockAll(xid);
-        synchronized (origin_data) {
-            RMHashMap data = origin_data.get(xid);
+        synchronized (local_copy) {
+            RMHashMap data = local_copy.get(xid);
             if (data != null) {
                 for (String key : data.keySet()) {
                     if (data.get(key) == null) {
@@ -511,8 +499,21 @@ public class RMIMiddleware extends ResourceManager {
                         }
                     }
                 }
-                origin_data.remove(xid);
+                local_copy.remove(xid);
             }
+        }
+        return tm.commit(xid);
+    }
+
+    public boolean abort(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        if (!tm.transactionExist(xid))
+        {
+            throw new InvalidTransactionException(xid, "transaction not exist.");
+        }
+        lm.UnlockAll(xid);
+        synchronized (local_copy) {
+            local_copy.remove(xid);
         }
         return tm.abort(xid);
     }
@@ -536,6 +537,107 @@ public class RMIMiddleware extends ResourceManager {
         }
         System.out.println("Middleware shut down successfully!");
         System.exit(1);
+    }
+
+    public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        if (!tm.transactionExist(xid))
+        {
+            throw new InvalidTransactionException(xid, "transaction not exist.");
+        }
+        // forward 2-pc to transactionManager = VOTE-REQ
+        boolean yn = tm.twoPC(xid);
+        // all vote YES, then commit locally
+        if (yn)
+        {
+            lm.UnlockAll(xid);
+            synchronized (origin_data) {
+                origin_data.remove(xid);
+            }
+            return true;
+        } else {
+        // someone votes NO, then abort locally
+            lm.UnlockAll(xid);
+            synchronized (origin_data) {
+                RMHashMap data = origin_data.get(xid);
+                if (data != null) {
+                    for (String key : data.keySet()) {
+                        if (data.get(key) == null) {
+                            synchronized (m_data) {
+                                m_data.remove(key);
+                            }
+                        } else {
+                            synchronized (m_data) {
+                                m_data.put(key, data.get(key));
+                            }
+                        }
+                    }
+                    origin_data.remove(xid);
+                }
+            }
+            return false;
+        }
+    }
+
+    public boolean commitShadowing(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        String committed = "./" + m_name + ".A";
+        String working = "./" + m_name + ".B";
+        String master = "./" + m_name + ".master";
+        if (master_rec.get(0) == 1) {
+            String tmp = committed;
+            committed = working;
+            working = tmp;
+        }
+        try {
+            // ObjectOutputStream committed_file = new ObjectOutputStream(new FileOutputStream(committed));
+            ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working));
+            ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master));
+            working_file.writeObject(m_data);
+            working_file.writeObject(lm.getTables());
+            working_file.writeObject(tm.getRMTable());
+            working_file.writeObject(tm.getTimeTable());
+            working_file.close();
+            master_rec.set(0, 1 - master_rec.get(0));
+            master_rec.set(1, xid);
+            master_file.writeObject(master_rec);
+            master_file.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return true;
+    }
+
+    public boolean abortShadowing(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+    {
+        String committed = "./" + m_name + ".A";
+        String working = "./" + m_name + ".B";
+        String master = "./" + m_name + ".master";
+        if (master_rec.get(0) == 1) {
+            String tmp = committed;
+            committed = working;
+            working = tmp;
+        }
+        try {
+            ObjectInputStream committed_file = new ObjectInputStream(new FileInputStream(committed));
+            m_data = (RMHashMap) committed_file.readObject();
+            lm.setTables((Vector<TPHashTable>) committed_file.readObject());
+            tm.setRMTable((Hashtable<Integer, Vector<IResourceManager>>) committed_file.readObject());
+            tm.setTimeTable((Hashtable<Integer, Long>) committed_file.readObject());
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return true;
     }
 
     private IResourceManager givenKey(String key)

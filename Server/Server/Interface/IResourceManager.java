@@ -3,6 +3,7 @@ package Server.Interface;
 import Server.LockManager.InvalidTransactionException;
 import Server.LockManager.TransactionAbortedException;
 
+import java.io.Serializable;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 
@@ -24,7 +25,7 @@ import java.util.*;
  * has succeeded.
  */
 
-public interface IResourceManager extends Remote 
+public interface IResourceManager extends Remote, Serializable
 {
     /**
      * Add seats to a flight.
@@ -225,4 +226,7 @@ public interface IResourceManager extends Remote
 
     public void shutdown()
         throws RemoteException;
+
+    public boolean twoPC(int id)
+        throws RemoteException, TransactionAbortedException, InvalidTransactionException;
 }
