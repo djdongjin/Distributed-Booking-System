@@ -516,8 +516,6 @@ public class RMIMiddleware extends ResourceManager {
         synchronized (local_copy) {
             local_copy.remove(xid);
         }
-        // TODO: Write ABORT record in log
-        // writeLog();
         return tm.abort(xid);
     }
 
@@ -641,6 +639,29 @@ public class RMIMiddleware extends ResourceManager {
             e.printStackTrace();
         }
         return true;
+    }
+
+    public void resetCrashes() throws RemoteException
+    {
+        tm.resetCrashes();
+        flightRM.resetCrashes();
+        carRM.resetCrashes();
+        roomRM.resetCrashes();
+    }
+
+    public void crashMiddleware(int mode) throws RemoteException
+    {
+        tm.crashMiddleware(mode);
+    }
+
+    public void crashResourceManager(String name /* RM Name */, int mode) throws RemoteException
+    {
+        if (name.equals("flight"))
+            flightRM.crashResourceManager("flight", mode);
+        else if (name.equals("room"))
+            roomRM.crashResourceManager("room", mode);
+        else if (name.equals("car"))
+            carRM.crashResourceManager("car", mode);
     }
 
     private IResourceManager givenKey(String key)

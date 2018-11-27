@@ -23,6 +23,8 @@ public class ResourceManager implements IResourceManager {
 	protected Hashtable<Integer, Boolean> xid_yn;
 	private static long MAX_EXIST_TIME_RM = 100000;
 
+	protected ArrayList<Boolean> crash_rm = new ArrayList<>(6);
+
 	//	protected HashMap<Integer, RMHashMap> origin_data = new HashMap<>();
 	protected HashMap<Integer, RMHashMap> local_copy = new HashMap<>();
 
@@ -520,5 +522,21 @@ public class ResourceManager implements IResourceManager {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public void resetCrashes() throws RemoteException
+	{
+		for (int i=1; i<=6; i++)
+			crash_rm.set(i, false);
+	}
+
+	public void crashMiddleware(int mode) throws RemoteException
+	{
+		;
+	}
+
+	public void crashResourceManager(String name /* RM Name */, int mode) throws RemoteException
+	{
+		crash_rm.set(mode, true);
 	}
 }

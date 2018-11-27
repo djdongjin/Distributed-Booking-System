@@ -4,10 +4,7 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.Vector;
-import java.util.Hashtable;
+import java.util.*;
 
 import Server.Common.LogItem;
 import Server.Interface.IResourceManager;
@@ -20,12 +17,15 @@ public class TransactionManager {
     private static long MAX_VOTING_TIME = 80000;
     private String mid_name;
 
+    public ArrayList<Boolean> crash_middle = new ArrayList<>(9);
 
     public TransactionManager(String name)
     {
         xid_rm = new Hashtable<>();
         xid_time = new Hashtable<Integer, Long>();
         mid_name = name;
+        for (int i=0; i<crash_middle.size(); i++)
+            crash_middle.set(i, false);
     }
 
     public int start()
@@ -83,8 +83,15 @@ public class TransactionManager {
                     vote_thread.interrupt();
                     writeLog(new LogItem(xid, "ABORT"));
                     for (IResourceManager rm: vote.keySet())
-                        if (vote.get(rm) == 1)
+                        if (vote.get(rm) == 1) {
                             rm.abort(xid);
+                        }
+                    synchronized (xid_rm) {
+                        xid_time.remove(xid);
+                    }
+                    synchronized (xid_rm) {
+                        xid_rm.remove(xid);
+                    }
                     return false;
                 }
                 // all rm votes
@@ -103,6 +110,12 @@ public class TransactionManager {
                         for (IResourceManager rm: vote.keySet())
                             if (vote.get(rm) == 1)
                                 rm.abort(xid);
+                        synchronized (xid_rm) {
+                            xid_time.remove(xid);
+                        }
+                        synchronized (xid_rm) {
+                            xid_rm.remove(xid);
+                        }
                         return false;
                     }
                 }
@@ -217,5 +230,12 @@ public class TransactionManager {
         }
     }
 
+    public void resetCrashes() {
+        for (int i=0; i<crash_middle.size(); i++)
+            crash_middle.set(i, false);
+    }
 
+    public void crashMiddleware(int mode) {
+        crash_middle.set(mode, true);
+    }
 }

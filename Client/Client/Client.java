@@ -87,6 +87,32 @@ public abstract class Client
 					}
 					break;
 				}
+				case ResetCrashes: {
+					if (arguments.size() == 1) {
+						m_resourceManager.resetCrashes();
+						System.out.println("Reset all crashes.");
+					} else {
+						System.err.println((char) 27 + "[31;1mCommand exception: " + (char) 27 + "[0mImproper use of reset command.");
+					}
+					break;
+				}
+				case CrashMiddleware: {
+					checkArgumentsCount(2, arguments.size());
+					System.out.println("Will crash middleware [mode=" + arguments.elementAt(1) + "]");
+
+					int mode = toInt(arguments.elementAt(1));
+					m_resourceManager.crashMiddleware(mode);
+					break;
+				}
+				case CrashRM: {
+					checkArgumentsCount(3, arguments.size());
+					System.out.println("Will crash RM [Name=" + arguments.elementAt(1) + "],[mode=" + arguments.elementAt(2) + "]");
+
+					String nm = arguments.elementAt(1);
+					int mode = toInt(arguments.elementAt(2));
+					m_resourceManager.crashResourceManager(nm, mode);
+					break;
+				}
 				case Start: {
 					if (arguments.size() == 1) {
 						int id = m_resourceManager.start();
@@ -107,7 +133,7 @@ public abstract class Client
 //					System.out.println("[" + id + "] commit Successfully.");
 					boolean yn = m_resourceManager.twoPC(id);
 					if (yn)
-						System.out.println("[" + id + "] commit Succeed.");
+						System.out.println("[" + id + "] commit Succeeded.");
 					else
 						System.out.println("[" + id + "] commit Fail, and has been aborted.");
 					break;
