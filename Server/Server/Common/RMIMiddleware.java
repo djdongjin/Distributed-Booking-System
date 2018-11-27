@@ -436,6 +436,8 @@ public class RMIMiddleware extends ResourceManager {
 
     private void lockSomething(int xid, String key, TransactionLockObject.LockType lc) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
+        // connectServer("room", s_roomHost, s_roomPort, s_roomName);
+
         if (!tm.transactionExist(xid))
         {
             throw new InvalidTransactionException(xid, "transaction not exist.");
@@ -595,9 +597,7 @@ public class RMIMiddleware extends ResourceManager {
             ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working));
             ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master));
             working_file.writeObject(m_data);
-            working_file.writeObject(lm.getTables());
             working_file.writeObject(tm.getRMTable());
-            working_file.writeObject(tm.getTimeTable());
             working_file.close();
             master_rec.set(0, 1 - master_rec.get(0));
             master_rec.set(1, xid);
@@ -628,7 +628,6 @@ public class RMIMiddleware extends ResourceManager {
             m_data = (RMHashMap) committed_file.readObject();
             lm.setTables((Vector<TPHashTable>) committed_file.readObject());
             tm.setRMTable((Hashtable<Integer, Vector<IResourceManager>>) committed_file.readObject());
-            tm.setTimeTable((Hashtable<Integer, Long>) committed_file.readObject());
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
