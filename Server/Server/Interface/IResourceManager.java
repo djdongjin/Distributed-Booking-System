@@ -229,4 +229,7 @@ public interface IResourceManager extends Remote, Serializable
 
     public boolean twoPC(int id)
         throws RemoteException, TransactionAbortedException, InvalidTransactionException;
+
+    public boolean prepare(int xid)
+        throws RemoteException, TransactionAbortedException, InvalidTransactionException;
 }

@@ -46,6 +46,17 @@ public class RMIResourceManager extends ResourceManager
 			final Registry registry = l_registry;
 			registry.rebind(s_rmiPrefix + s_serverName, resourceManager);
 
+			// timeout monitor
+			Thread timeout_minitor = new Thread(new Runnable() {
+				@Override
+				public void run() {
+					while (true) {
+						server.timeoutDetect();
+					}
+				}
+			});
+			timeout_minitor.start();
+
 			Runtime.getRuntime().addShutdownHook(new Thread() {
 				public void run() {
 					try {
@@ -77,4 +88,5 @@ public class RMIResourceManager extends ResourceManager
 	{
 		super(name);
 	}
+
 }

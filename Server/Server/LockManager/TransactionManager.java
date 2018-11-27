@@ -1,10 +1,15 @@
 package Server.LockManager;
 
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.Vector;
 import java.util.Hashtable;
+
+import Server.Common.LogItem;
 import Server.Interface.IResourceManager;
 
 public class TransactionManager {
@@ -12,12 +17,15 @@ public class TransactionManager {
     private Hashtable<Integer, Long> xid_time;
     private static int num_transaction = 0;
     private static long MAX_EXIST_TIME = 100000;
+    private static long MAX_VOTING_TIME = 80000;
+    private String mid_name;
 
 
-    public TransactionManager()
+    public TransactionManager(String name)
     {
         xid_rm = new Hashtable<>();
         xid_time = new Hashtable<Integer, Long>();
+        mid_name = name;
     }
 
     public int start()
@@ -40,35 +48,64 @@ public class TransactionManager {
             tmp.add(rm);
             xid_rm.put(xid, tmp);
         }
-//        try {
-//            for (IResourceManager xxx : tmp)
-//                System.out.print(xxx.getName());
-//        } catch (RemoteException e) {
-//            e.printStackTrace();
-//        }
     }
 
     public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
-        Vector<IResourceManager> vote = new Vector<>();
-        boolean final_res = true;
+        HashMap<IResourceManager, Integer> vote = new HashMap<>();
+        int num_rm = xid_rm.get(xid).size();
+
         try {
+            // write start-2PC record in log
+            writeLog(new LogItem(xid, "start-2PC"));
             // send VOTE-REQ request
             // TODO: may timeout when waiting for all votes
-            for (IResourceManager rm : xid_rm.get(xid)) {
-                boolean res = rm.twoPC(xid);
-                if (res)
-                    vote.add(rm);
-                final_res &= res;
-            }
-            // if all vote YES, commit RM and return true(commit locally)
-            if (final_res) {
-                commit(xid);
-                return true;
-            } else {
-            // if someone votes NO, abort RM and return false(commit locally)
-                abort(xid);
-                return false;
+            long begin_time = System.currentTimeMillis();
+            Thread vote_thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for (IResourceManager rm : vote.keySet()) {
+                        try {
+                            int res = rm.prepare(xid) ? 1: 0;
+                            vote.put(rm, res);
+                        } catch(Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+            vote_thread.start();
+
+            while (true) {
+                if (System.currentTimeMillis() - begin_time > MAX_VOTING_TIME)
+                {
+                    // timeout
+                    vote_thread.interrupt();
+                    writeLog(new LogItem(xid, "ABORT"));
+                    for (IResourceManager rm: vote.keySet())
+                        if (vote.get(rm) == 1)
+                            rm.abort(xid);
+                    return false;
+                }
+                // all rm votes
+                if (vote.size() == num_rm) {
+                    int vote_res = 0;
+                    for (Integer i: vote.values())
+                        vote_res += i;
+                    if (vote_res == num_rm) {
+                        // all vote YES
+                        writeLog(new LogItem(xid, "COMMIT"));
+                        commit(xid);
+                        return true;
+                    } else {
+                        // some votes NO
+                        writeLog(new LogItem(xid, "ABORT"));
+                        for (IResourceManager rm: vote.keySet())
+                            if (vote.get(rm) == 1)
+                                rm.abort(xid);
+                        return false;
+                    }
+                }
             }
         } catch(RemoteException e) {
             e.printStackTrace();
@@ -166,6 +203,18 @@ public class TransactionManager {
     public void setTimeTable(Hashtable<Integer, Long> xidtime)
     {
         xid_time = xidtime;
+    }
+
+    public void writeLog(LogItem lg)
+    {
+        System.out.println(">>>LOG: <xid,info>:" + lg.xid + ", " + lg.info);
+        try {
+            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(mid_name + ".log"));
+            out.writeObject(lg);
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 

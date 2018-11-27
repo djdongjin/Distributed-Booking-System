@@ -3,6 +3,10 @@ package Client;
 public enum Command {
 	Help("List all available commands", "[CommandName]"),
 
+	CrashMiddleware("Crash middleware", "<mode>"),
+	CrashRM("Crash RM", "<NameOfRM>,<mode>"),
+	ResetCrash("Reset all crashes", "no parameters"),
+
 	Start("Start a transaction", "no parameters"),
 	Commit("Commit a transaction", "<xid>"),
 	Abort("Abort a transaction", "<xid>"),

@@ -29,7 +29,7 @@ public class RMIMiddleware extends ResourceManager {
     private static String s_roomName = "Room";
 
     protected LockManager lm = new LockManager();
-    protected TransactionManager tm = new TransactionManager();
+    protected TransactionManager tm = null;
 
     private IResourceManager flightRM = null;
     private IResourceManager carRM = null;
@@ -126,6 +126,7 @@ public class RMIMiddleware extends ResourceManager {
     public RMIMiddleware(String name)
     {
         super(name);
+        tm = new TransactionManager(name);
     }
 
     public void connectServer(String tp, String server, int port, String name)
@@ -515,6 +516,8 @@ public class RMIMiddleware extends ResourceManager {
         synchronized (local_copy) {
             local_copy.remove(xid);
         }
+        // TODO: Write ABORT record in log
+        // writeLog();
         return tm.abort(xid);
     }
 
@@ -545,21 +548,14 @@ public class RMIMiddleware extends ResourceManager {
         {
             throw new InvalidTransactionException(xid, "transaction not exist.");
         }
-        // forward 2-pc to transactionManager = VOTE-REQ
+        // forward 2-pc to transactionManager
         boolean yn = tm.twoPC(xid);
         // all vote YES, then commit locally
         if (yn)
         {
             lm.UnlockAll(xid);
-            synchronized (origin_data) {
-                origin_data.remove(xid);
-            }
-            return true;
-        } else {
-        // someone votes NO, then abort locally
-            lm.UnlockAll(xid);
-            synchronized (origin_data) {
-                RMHashMap data = origin_data.get(xid);
+            synchronized (local_copy) {
+                RMHashMap data = local_copy.get(xid);
                 if (data != null) {
                     for (String key : data.keySet()) {
                         if (data.get(key) == null) {
@@ -572,8 +568,15 @@ public class RMIMiddleware extends ResourceManager {
                             }
                         }
                     }
-                    origin_data.remove(xid);
+                    local_copy.remove(xid);
                 }
+            }
+            return true;
+        } else {
+        // someone votes NO, then abort locally
+            lm.UnlockAll(xid);
+            synchronized (local_copy) {
+                local_copy.remove(xid);
             }
             return false;
         }

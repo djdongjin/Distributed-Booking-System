@@ -19,8 +19,11 @@ public class ResourceManager implements IResourceManager {
 	protected Vector<Integer> master_rec = new Vector<>();
 	protected String m_name = "";
 	protected RMHashMap m_data = new RMHashMap();
+	protected Hashtable<Integer, Long> xid_time;
+	protected Hashtable<Integer, Boolean> xid_yn;
+	private static long MAX_EXIST_TIME_RM = 100000;
 
-//	protected HashMap<Integer, RMHashMap> origin_data = new HashMap<>();
+	//	protected HashMap<Integer, RMHashMap> origin_data = new HashMap<>();
 	protected HashMap<Integer, RMHashMap> local_copy = new HashMap<>();
 
 	public ResourceManager(String p_name) {
@@ -392,13 +395,16 @@ public class ResourceManager implements IResourceManager {
 			}
 			local_copy.remove(id);
 		}
-
+		// write COMMIT record in log
+		writeLog(new LogItem(id, "COMMIT"));
 		return true;
 	}
 
 	public boolean abort(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException
 	{
 		local_copy.remove(id);
+		// write ABORT record in log
+		writeLog(new LogItem(id, "ABORT"));
 		return true;
 	}
 
@@ -411,15 +417,26 @@ public class ResourceManager implements IResourceManager {
 		}
 	}
 
-	public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+	public boolean prepare(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
 	{
-		// TODO: may timeout when waiting for VOTE-REQ
+		if (!local_copy.keySet().contains(xid))
+			return false;
 		// TODO: how to decide return value?
 		boolean ret = true;
-		if (!ret)
+		if (!ret) {
 			abort(xid);
+			System.out.println("Transaction [" + xid + "] has been aborted caused by VOTING NO!");
+		} else {
+			// TODO: shadowing, (write undo/redo information in log)
+			// Write a YES record in log
+			writeLog(new LogItem(xid, "YES"));
+		}
 		return ret;
-		// TODO: still may timeout after voting and before receving a decision
+	}
+
+	public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+	{
+		return true;
 	}
 
 	public boolean commitShadowing(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
@@ -475,5 +492,33 @@ public class ResourceManager implements IResourceManager {
 			e.printStackTrace();
 		}
 		return true;
+	}
+
+	public void writeLog(LogItem lg) {
+		System.out.println(">>>LOG: <xid,info>:" + lg.xid + ", " + lg.info);
+		try {
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(m_name + ".log"));
+			out.writeObject(lg);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void timeoutDetect()
+	{
+		try {
+			for (Integer xid : xid_time.keySet()) {
+				if ( xid_yn.get(xid) && System.currentTimeMillis() - xid_time.get(xid) > MAX_EXIST_TIME_RM) {
+					abort(xid);
+					// TODO: write ABORT record in log
+					writeLog(new LogItem(xid, "ABORT"));
+					System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
+					break;
+				}
+			}
+			Thread.sleep(100);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
