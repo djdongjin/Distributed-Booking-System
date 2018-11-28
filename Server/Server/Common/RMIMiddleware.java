@@ -115,6 +115,8 @@ public class RMIMiddleware extends ResourceManager {
                 }
             });
             reconnect_test.start();
+            // recover or new start
+            middle.restart();
 
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 public void run() {
@@ -122,8 +124,9 @@ public class RMIMiddleware extends ResourceManager {
                         registry.unbind(s_rmiPrefix + s_serverName);
                         System.out.println("'" + s_serverName + "' middleware server unbound");
                     } catch (Exception e) {
-                        System.err.println((char) 27 + "[31;1mMiddleware exception: " + (char) 27 + "[0mUncaught exception");
-                        e.printStackTrace();
+                        System.err.println((char) 27 + "[31;1mMiddleware exception: " + (char) 27 + "[0mUncaught exception at **addShutdownHook**.");
+
+                        // e.printStackTrace();
                     }
                 }
             });
@@ -170,7 +173,7 @@ public class RMIMiddleware extends ResourceManager {
                     if (first)
                     {
                         System.out.println("Waiting for '"+name+"' server ["+ server + ":" + port + "/" + s_rmiPrefix + name + "]");
-                        first = true;
+                        first = false;
                     }
                 }
                 Thread.sleep(500);
@@ -519,7 +522,7 @@ public class RMIMiddleware extends ResourceManager {
             }
             Thread.sleep(100);
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("Check reconnectTest of middleware...");
         }
     }
 
@@ -586,6 +589,12 @@ public class RMIMiddleware extends ResourceManager {
             System.out.println("Car RM shut down successfully!");
         }
         System.out.println("Middleware shut down successfully!");
+        String [] lst = new String[]{m_name+".A", m_name+".B", m_name+".log", m_name+".master", m_name+".crash"};
+        for (String f: lst) {
+            File file = new File(f);
+            if (file.exists() && file.delete())
+                System.out.println("delelte file: " + f);
+        }
         System.exit(1);
     }
 
@@ -637,8 +646,15 @@ public class RMIMiddleware extends ResourceManager {
         if (master_rec.get(0) == 1)
             working = "./" + m_name + ".A";
         try {
-            ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working));
-            ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master));
+            File working_f = new File(working);
+            if (!working_f.exists() && working_f.createNewFile())
+                System.out.println("Create new working version file: " + working);
+            File master_f = new File(master);
+            if (!master_f.exists() && master_f.createNewFile())
+                System.out.println("Create new master file: " + master);
+
+            ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working_f));
+            ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master_f));
             working_file.writeObject(m_data);
             working_file.writeObject(local_copy);
             working_file.writeObject(tm.getRMTable());
@@ -714,12 +730,19 @@ public class RMIMiddleware extends ResourceManager {
 
     public void restart()
     {
+        File tested = new File(m_name + ".master");
+        if (tested.exists()) {
+            System.out.println("Found shadowing files, ready to recover program and data.");
+        } else {
+            System.out.println("Not found shadowing files, initialize program.");
+            return;
+        }
         try {
             try {
-                File file = new File(m_name + ".crash");
-                ObjectInputStream crash_file = new ObjectInputStream(new FileInputStream(file));
+                ObjectInputStream crash_file = new ObjectInputStream(new FileInputStream(m_name + ".crash"));
                 ArrayList<Boolean> crash_tm = (ArrayList<Boolean>) crash_file.readObject();
                 crash_file.close();
+                File file = new File(m_name + ".crash");
                 file.delete();
                 if (crash_tm.get(8)) {
                     // Crash mode 8
@@ -750,8 +773,11 @@ public class RMIMiddleware extends ResourceManager {
                     if (xid_status.get(xid) == CoordinateStatus.COMMIT)
                         System.out.println("WRONG!!!! xid: "+xid+", old status: COMMIT, new status: ABORT!");
                     xid_status.put(xid, CoordinateStatus.ABORT);
-                } else if (info.equals("CRASH-in-RECOVER")) {
-                    tm.crash_middle.set(8, true);
+//                } else if (info.equals("CRASH-in-RECOVER")) {
+//                    tm.crash_middle.set(8, true);
+//                    System.out.println("!!! Please check log info:" + xid + ", " + info);
+//                }
+                } else {
                     System.out.println("!!! Please check log info:" + xid + ", " + info);
                 }
             }

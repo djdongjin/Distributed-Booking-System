@@ -304,7 +304,8 @@ public class TransactionManager {
     }
 
     public void crashMiddleware(int mode) {
-        writeLog(new LogItem(-111, "CRASH-in-RECOVER"));
+       // if (mode == 8)
+       //     writeLog(new LogItem(-111, "CRASH-in-RECOVER"));
         crash_middle.set(mode, true);
     }
 }

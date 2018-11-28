@@ -490,6 +490,12 @@ public class ResourceManager implements IResourceManager {
 	{
 		try {
 			System.out.println(getName() + "shutdown successfully!");
+            String [] lst = new String[]{m_name+".A", m_name+".B", m_name+".log", m_name+".master", m_name+".crash"};
+            for (String f: lst) {
+                File file = new File(f);
+                if (file.exists() && file.delete())
+                    System.out.println("delelte file: " + f);
+            }
 			System.exit(1);
 		} catch (RemoteException e) {
 			System.exit(1);
@@ -536,6 +542,13 @@ public class ResourceManager implements IResourceManager {
 		if (master_rec.get(0) == 1)
 			working = "./" + m_name + ".A";
 		try {
+            File working_f = new File(working);
+            if (!working_f.exists() && working_f.createNewFile())
+                System.out.println("Create new working version file: " + working);
+            File master_f = new File(master);
+            if (!master_f.exists() && master_f.createNewFile())
+                System.out.println("Create new master file: " + master);
+
 			ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working));
 			ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master));
 			working_file.writeObject(m_data);
@@ -620,12 +633,37 @@ public class ResourceManager implements IResourceManager {
 	}
 
 	public void crashResourceManager(String name /* RM Name */, int mode) throws RemoteException {
+//        if (mode == 5)
+//            writeLog(new LogItem(-111, "CRASH-in-RECOVER"));
 		crash_rm.set(mode, true);
 	}
 
 	public void restart()
 	{
+        File testted = new File(m_name + ".master");
+        if (testted.exists()) {
+            System.out.println("Found shadowing files, ready to recover program and data.");
+        } else {
+            System.out.println("Not found shadowing files, initialize program.");
+            return;
+        }
 		try {
+            try {
+                File file = new File(m_name + ".crash");
+                if (file.exists()) {
+                    ObjectInputStream crash_file = new ObjectInputStream(new FileInputStream(file));
+                    ArrayList<Boolean> crash_rm = (ArrayList<Boolean>) crash_file.readObject();
+                    crash_file.close();
+                    file.delete();
+                    if (crash_rm.get(5)) {
+                        // Crash mode 5
+                        System.out.println("crash mode 5: crash during recovery.");
+                        System.exit(1);
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                System.out.println("Don't need to read crash mode from disk.");
+            }
             recoverShadowing();
 			HashMap<Integer, ParticipantStatue> xid_status = new HashMap<>();
 			ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
