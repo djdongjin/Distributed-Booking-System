@@ -26,8 +26,8 @@ public class TransactionManager {
         xid_rm = new Hashtable<>();
         xid_time = new Hashtable<Integer, Long>();
         mid_name = name;
-        for (int i = 0; i < crash_middle.size(); i++)
-            crash_middle.set(i, false);
+        for (int i = 0; i < 9; i++)
+            crash_middle.add(false);
     }
 
     public int start() {
@@ -59,6 +59,7 @@ public class TransactionManager {
     public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
         HashMap<IResourceManager, Integer> vote = new HashMap<>();
         int num_rm = xid_rm.get(xid).size();
+        int vote_loop = 0;
 
         try {
             // write start-2PC record in log
@@ -73,49 +74,53 @@ public class TransactionManager {
                 System.exit(1);
             }
 
-            Thread vote_thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    for (IResourceManager rm : vote.keySet()) {
-                        Thread rm_prepare = new Thread(new Runnable() {
+            while (true) {
+                if (System.currentTimeMillis() - begin_time > vote_loop * MAX_VOTING_TIME) {
+                    if (vote_loop <= 1) {
+                        //revote
+                        vote_loop++;
+                        Thread vote_thread = new Thread(new Runnable() {
+                            @Override
                             public void run() {
-                                try {
-                                    int res = rm.prepare(xid) ? 1 : 0;
-                                    vote.put(rm, res);
-                                } catch (Exception e) {
-                                    e.printStackTrace();
+                                for (IResourceManager rm : vote.keySet()) {
+                                    Thread rm_prepare = new Thread(new Runnable() {
+                                        public void run() {
+                                            try {
+                                                int res = rm.prepare(xid) ? 1 : 0;
+                                                vote.put(rm, res);
+                                            } catch (Exception e) {
+                                                System.out.println("One of RMs crashed, need to wait for the second voting round.");
+                                            }
+                                        }
+                                    });
+                                    rm_prepare.start();
+                                }
+
+                                // Crash mode 2
+                                if (crash_middle.get(2) && vote.size() == 0) {
+                                    System.out.println(
+                                            "crash mode 2: crash after sending all vote requests and before receiving any replies");
+                                    System.exit(1);
                                 }
                             }
                         });
-                        rm_prepare.start();
-                    }
-
-                    // Crash mode 2
-                    if (crash_middle.get(2) && vote.size() == 0) {
-                        System.out.println(
-                                "crash mode 2: crash after sending all vote requests and before receiving any replies");
-                        System.exit(1);
-                    }
-                }
-            });
-            vote_thread.start();
-
-            while (true) {
-                if (System.currentTimeMillis() - begin_time > MAX_VOTING_TIME) {
-                    // timeout
-                    vote_thread.interrupt();
-                    writeLog(new LogItem(xid, "ABORT"));
-                    for (IResourceManager rm : vote.keySet())
-                        if (vote.get(rm) == 1) {
-                            rm.abort(xid);
+                        vote_thread.start();
+                    } else {
+                        // timeout
+                        // vote_thread.interrupt();
+                        writeLog(new LogItem(xid, "ABORT"));
+                        for (IResourceManager rm : vote.keySet())
+                            if (vote.get(rm) == 1) {
+                                rm.abort(xid);
+                            }
+                        synchronized (xid_rm) {
+                            xid_time.remove(xid);
                         }
-                    synchronized (xid_rm) {
-                        xid_time.remove(xid);
+                        synchronized (xid_rm) {
+                            xid_rm.remove(xid);
+                        }
+                        return false;
                     }
-                    synchronized (xid_rm) {
-                        xid_rm.remove(xid);
-                    }
-                    return false;
                 }
 
                 // Crash mode 3
@@ -173,7 +178,6 @@ public class TransactionManager {
                             System.out.println("crash mode 7: crash after sending all decisions");
                             System.exit(1);
                         }
-
                         return false;
                     }
                 }
@@ -291,7 +295,16 @@ public class TransactionManager {
             crash_middle.set(i, false);
     }
 
+//    public void readCrashFromFile(ArrayList<Boolean> fromFile) {
+//        crash_middle = fromFile;
+//    }
+
+    public void updateTransactionCount(int new_count) {
+        TransactionManager.num_transaction = new_count;
+    }
+
     public void crashMiddleware(int mode) {
+        writeLog(new LogItem(-111, "CRASH-in-RECOVER"));
         crash_middle.set(mode, true);
     }
 }

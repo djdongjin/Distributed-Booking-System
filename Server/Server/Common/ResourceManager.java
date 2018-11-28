@@ -19,8 +19,8 @@ public class ResourceManager implements IResourceManager {
 	protected Vector<Integer> master_rec = new Vector<>();
 	protected String m_name = "";
 	protected RMHashMap m_data = new RMHashMap();
-	protected Hashtable<Integer, Long> xid_time;
-	protected Hashtable<Integer, Boolean> xid_yn;
+	protected Hashtable<Integer, Long> xid_time = new Hashtable<>();
+	protected Hashtable<Integer, Boolean> xid_yn = new Hashtable<>();
 	private static long MAX_EXIST_TIME_RM = 100000;
 
 	// TODO: Crash mode 5 in RM recovery
@@ -31,6 +31,10 @@ public class ResourceManager implements IResourceManager {
 
 	public ResourceManager(String p_name) {
 		m_name = p_name;
+		for (int i=0; i<6; i++)
+			crash_rm.add(false);
+		master_rec.add(0);
+		master_rec.add(0);
 	}
 
 	// Reads a data item
@@ -551,7 +555,7 @@ public class ResourceManager implements IResourceManager {
 		return true;
 	}
 
-	public boolean abortShadowing(int xid)
+	public boolean recoverShadowing()
 			throws RemoteException, TransactionAbortedException, InvalidTransactionException {
 		try {
 			String master = "./" + m_name + ".master";
@@ -622,6 +626,7 @@ public class ResourceManager implements IResourceManager {
 	public void restart()
 	{
 		try {
+            recoverShadowing();
 			HashMap<Integer, ParticipantStatue> xid_status = new HashMap<>();
 			ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
 			LogItem it = null;
