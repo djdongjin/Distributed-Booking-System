@@ -238,4 +238,6 @@ public interface IResourceManager extends Remote, Serializable
     public void crashMiddleware(int mode) throws RemoteException;
 
     public void crashResourceManager(String name /* RM Name */, int mode) throws RemoteException;
+
+    public void pingTest() throws RemoteException;
 }

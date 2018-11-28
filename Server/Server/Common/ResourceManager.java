@@ -111,8 +111,6 @@ public class ResourceManager implements IResourceManager {
 
 	// Deletes the encar item
 	protected boolean deleteItem(int xid, String key) {
-		xid_time.put(xid, System.currentTimeMillis());
-		xid_yn.put(xid, true);
 		Trace.info("RM::deleteItem(" + xid + ", " + key + ") called");
 		ReservableItem curObj = (ReservableItem) readData(xid, key);
 		// Check if there is such an item in the storage
@@ -429,8 +427,12 @@ public class ResourceManager implements IResourceManager {
 		return -1;
 	}
 
-	public boolean commit(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-
+	public boolean commit(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+	{
+		if (!xid_time.keySet().contains(id)) {
+			System.out.println("||| " + id + " has been cimmitted/aborted before!!");
+			return true;
+		}
 		// Crash mode 4
 		if (crash_rm.get(4)) {
 			System.out.println("crash mode 4: crash after receiving decision but before committing");
@@ -451,14 +453,21 @@ public class ResourceManager implements IResourceManager {
 				}
 			}
 			local_copy.remove(id);
+			xid_time.remove(id);
+			xid_yn.remove(id);
 		}
 		// write COMMIT record in log
 		writeLog(new LogItem(id, "COMMIT"));
+		commitShadowing(id);
 		return true;
 	}
 
-	public boolean abort(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-
+	public boolean abort(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+	{
+		if (!xid_time.keySet().contains(id)) {
+			System.out.println("||| " + id + " has been cimmitted/aborted before!!");
+			return true;
+		}
 		// Crash mode 4
 		if (crash_rm.get(4)) {
 			System.out.println("crash mode 4: crash after receiving decision but before aborting");
@@ -466,12 +475,15 @@ public class ResourceManager implements IResourceManager {
 		}
 
 		local_copy.remove(id);
+		xid_time.remove(id);
+		xid_yn.remove(id);
 		// write ABORT record in log
 		writeLog(new LogItem(id, "ABORT"));
 		return true;
 	}
 
-	public void shutdown() {
+	public void shutdown()
+	{
 		try {
 			System.out.println(getName() + "shutdown successfully!");
 			System.exit(1);
@@ -486,23 +498,15 @@ public class ResourceManager implements IResourceManager {
 			System.out.println("crash mode 1: crash after receiving vote request but before sending answer");
 			System.exit(1);
 		}
-		if (!local_copy.keySet().contains(xid)) {
+		if (!xid_time.keySet().contains(xid)) {
 			// Crash mode 2
 			if (crash_rm.get(2)) {
 				System.out.println("crash mode 2: crash after deciding which answer to send");
 				System.exit(1);
 			}
-			return false;
-		}
-		// TODO: how to decide return value?
-		boolean ret = true;
-		if (!ret) {
 			abort(xid);
 			System.out.println("Transaction [" + xid + "] has been aborted caused by VOTING NO!");
-		} else {
-			// TODO: shadowing, (write undo/redo information in log)
-			// Write a YES record in log
-			writeLog(new LogItem(xid, "YES"));
+			return false;
 		}
 
 		// Crash mode 2
@@ -511,7 +515,10 @@ public class ResourceManager implements IResourceManager {
 			System.exit(1);
 		}
 
-		return ret;
+		// TODO: shadowing, (write undo/redo information in log)
+		// Write a YES record in log
+		writeLog(new LogItem(xid, "YES"));
+		return true;
 	}
 
 	public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
@@ -520,20 +527,15 @@ public class ResourceManager implements IResourceManager {
 
 	public boolean commitShadowing(int xid)
 			throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-		String committed = "./" + m_name + ".A";
 		String working = "./" + m_name + ".B";
 		String master = "./" + m_name + ".master";
-		if (master_rec.get(0) == 1) {
-			String tmp = committed;
-			committed = working;
-			working = tmp;
-		}
+		if (master_rec.get(0) == 1)
+			working = "./" + m_name + ".A";
 		try {
-			// ObjectOutputStream committed_file = new ObjectOutputStream(new
-			// FileOutputStream(committed));
 			ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working));
 			ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master));
 			working_file.writeObject(m_data);
+			working_file.writeObject(local_copy);
 			working_file.close();
 			master_rec.set(0, 1 - master_rec.get(0));
 			master_rec.set(1, xid);
@@ -551,17 +553,21 @@ public class ResourceManager implements IResourceManager {
 
 	public boolean abortShadowing(int xid)
 			throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-		String committed = "./" + m_name + ".A";
-		String working = "./" + m_name + ".B";
-		String master = "./" + m_name + ".master";
-		if (master_rec.get(0) == 1) {
-			String tmp = committed;
-			committed = working;
-			working = tmp;
-		}
 		try {
+			String master = "./" + m_name + ".master";
+			ObjectInputStream master_file = new ObjectInputStream(new FileInputStream(master));
+			master_rec = (Vector<Integer>) master_file.readObject();
+			master_file.close();
+
+			String committed = "./" + m_name + ".A";
+
+			if (master_rec.get(0) == 1)
+				committed = "./" + m_name + ".B";
+
 			ObjectInputStream committed_file = new ObjectInputStream(new FileInputStream(committed));
 			m_data = (RMHashMap) committed_file.readObject();
+			local_copy = (HashMap<Integer, RMHashMap>) committed_file.readObject();
+			committed_file.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
@@ -577,7 +583,7 @@ public class ResourceManager implements IResourceManager {
 	public void writeLog(LogItem lg) {
 		System.out.println(">>>LOG: <xid,info>:" + lg.xid + ", " + lg.info);
 		try {
-			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(m_name + ".log"));
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(m_name + ".log", true));
 			out.writeObject(lg);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -589,8 +595,7 @@ public class ResourceManager implements IResourceManager {
 			for (Integer xid : xid_time.keySet()) {
 				if (xid_yn.get(xid) && System.currentTimeMillis() - xid_time.get(xid) > MAX_EXIST_TIME_RM) {
 					abort(xid);
-					// TODO: write ABORT record in log
-					writeLog(new LogItem(xid, "ABORT"));
+					// ABORT
 					System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
 					break;
 				}
@@ -643,8 +648,8 @@ public class ResourceManager implements IResourceManager {
 						break;
 					}
 					case YES: {
-						System.out.println("RESTART " + m_name + ": Found YES log of " + xid +".");
-						System.out.println("RESTART " + m_name + ":" + xid +" need to be blocked.");
+						System.out.println("RESTART: Found YES log of " + xid +".");
+						System.out.println("RESTART:" + xid +" will be blocked.");
 					}
 					case COMMIT:
 					case ABORT:
@@ -652,15 +657,19 @@ public class ResourceManager implements IResourceManager {
 				}
 			}
 		} catch (FileNotFoundException e) {
-			System.out.println("XXXXXX:" + "Not found log file!");
+			System.out.println("RESTART: Not found log file!");
 		} catch (IOException e) {
-			System.out.println("XXXXXX:" + "IO Exception at " + m_name);
+			System.out.println("RESTART: IO Exception at " + m_name);
 		} catch (ClassNotFoundException e) {
-			System.out.println("XXXXXX:" + "ClassNotFoundException at " + m_name);
+			System.out.println("RESTART: ClassNotFoundException at " + m_name);
 			e.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public void pingTest() {
+		int i = 0;
 	}
 }
 

@@ -35,6 +35,8 @@ public class RMIMiddleware extends ResourceManager {
     private IResourceManager carRM = null;
     private IResourceManager roomRM = null;
 
+    private boolean yn_timeout = true;
+
     public static void main(String[] args)
     {
         // RMIMiddleware server name
@@ -103,6 +105,17 @@ public class RMIMiddleware extends ResourceManager {
             });
             time_to_live.start();
 
+            // re-connect to RM in case of crash of RM
+            Thread reconnect_test = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (true) {
+                        middle.reconnectTest();
+                    }
+                }
+            });
+            reconnect_test.start();
+
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 public void run() {
                     try {
@@ -139,10 +152,13 @@ public class RMIMiddleware extends ResourceManager {
                     Registry registry = LocateRegistry.getRegistry(server, port);
                     if (tp.equals("flight")) {
                         flightRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
+                        tm.updateRM("flight", flightRM);
                     } else if (tp.equals("car")) {
                         carRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
+                        tm.updateRM("car", carRM);
                     } else if (tp.equals("room")) {
                         roomRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
+                        tm.updateRM("room", roomRM);
                     } else {
                         System.err.println((char)27 + "[Please specify four ResourceManagers, or use default values.");
                         System.exit(1);
@@ -437,7 +453,6 @@ public class RMIMiddleware extends ResourceManager {
     private void lockSomething(int xid, String key, TransactionLockObject.LockType lc) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         // connectServer("room", s_roomHost, s_roomPort, s_roomName);
-
         if (!tm.transactionExist(xid))
         {
             throw new InvalidTransactionException(xid, "transaction not exist.");
@@ -462,13 +477,45 @@ public class RMIMiddleware extends ResourceManager {
 
     public void timeoutDetect()
     {
-        try {
-            for (Integer xid : tm.activeTransaction()) {
-                if (!tm.checkTime(xid)) {
-                    abort(xid);
-                    System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
-                    break;
+        if (yn_timeout) {
+            try {
+                for (Integer xid : tm.activeTransaction()) {
+                    if (!tm.checkTime(xid)) {
+                        abort(xid);
+                        System.out.println("Transaction [" + xid + "] has been aborted caused by timeout!");
+                        break;
+                    }
                 }
+                Thread.sleep(100);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void reconnectTest()
+    {
+        try {
+            try {
+                flightRM.pingTest();
+            } catch (RemoteException e) {
+                System.out.println("Flight resource manager crashed, re-connecting...");
+                connectServer("flight", s_flightHost, s_flightPort, s_flightName);
+                System.out.println("Flight resource manager crashed, re-conneced...");
+            }
+            try {
+                carRM.pingTest();
+            } catch (RemoteException e) {
+                System.out.println("Car resource manager crashed, re-connecting...");
+                connectServer("car", s_carHost, s_carPort, s_carName);
+                System.out.println("Car resource manager crashed, re-conneced...");
+            }
+            try {
+                roomRM.pingTest();
+            } catch (RemoteException e) {
+                System.out.println("Room resource manager crashed, re-connecting...");
+                connectServer("room", s_roomHost, s_roomPort, s_roomName);
+                System.out.println("Room resource manager crashed, re-conneced...");
             }
             Thread.sleep(100);
         } catch (Exception e) {
@@ -481,32 +528,32 @@ public class RMIMiddleware extends ResourceManager {
         return tm.start();
     }
 
-    public boolean commit(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
-    {
-        if (!tm.transactionExist(xid))
-        {
-            throw new InvalidTransactionException(xid, "transaction not exist.");
-        }
-        lm.UnlockAll(xid);
-        synchronized (local_copy) {
-            RMHashMap data = local_copy.get(xid);
-            if (data != null) {
-                for (String key : data.keySet()) {
-                    if (data.get(key) == null) {
-                        synchronized (m_data) {
-                            m_data.remove(key);
-                        }
-                    } else {
-                        synchronized (m_data) {
-                            m_data.put(key, data.get(key));
-                        }
-                    }
-                }
-                local_copy.remove(xid);
-            }
-        }
-        return tm.commit(xid);
-    }
+//    public boolean commit(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
+//    {
+//        if (!tm.transactionExist(xid))
+//        {
+//            throw new InvalidTransactionException(xid, "transaction not exist.");
+//        }
+//        lm.UnlockAll(xid);
+//        synchronized (local_copy) {
+//            RMHashMap data = local_copy.get(xid);
+//            if (data != null) {
+//                for (String key : data.keySet()) {
+//                    if (data.get(key) == null) {
+//                        synchronized (m_data) {
+//                            m_data.remove(key);
+//                        }
+//                    } else {
+//                        synchronized (m_data) {
+//                            m_data.put(key, data.get(key));
+//                        }
+//                    }
+//                }
+//                local_copy.remove(xid);
+//            }
+//        }
+//        return tm.commit(xid);
+//    }
 
     public boolean abort(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
@@ -571,6 +618,7 @@ public class RMIMiddleware extends ResourceManager {
                     local_copy.remove(xid);
                 }
             }
+            commitShadowing(xid);
             return true;
         } else {
         // someone votes NO, then abort locally
@@ -581,22 +629,18 @@ public class RMIMiddleware extends ResourceManager {
             return false;
         }
     }
-
+    // used for writing data to disk when committing
     public boolean commitShadowing(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
-        String committed = "./" + m_name + ".A";
         String working = "./" + m_name + ".B";
         String master = "./" + m_name + ".master";
-        if (master_rec.get(0) == 1) {
-            String tmp = committed;
-            committed = working;
-            working = tmp;
-        }
+        if (master_rec.get(0) == 1)
+            working = "./" + m_name + ".A";
         try {
-            // ObjectOutputStream committed_file = new ObjectOutputStream(new FileOutputStream(committed));
             ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working));
             ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master));
             working_file.writeObject(m_data);
+            working_file.writeObject(local_copy);
             working_file.writeObject(tm.getRMTable());
             working_file.close();
             master_rec.set(0, 1 - master_rec.get(0));
@@ -615,19 +659,24 @@ public class RMIMiddleware extends ResourceManager {
 
     public boolean abortShadowing(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
-        String committed = "./" + m_name + ".A";
-        String working = "./" + m_name + ".B";
-        String master = "./" + m_name + ".master";
-        if (master_rec.get(0) == 1) {
-            String tmp = committed;
-            committed = working;
-            working = tmp;
-        }
         try {
+            String master = "./" + m_name + ".master";
+            ObjectInputStream master_file = new ObjectInputStream(new FileInputStream(master));
+            master_rec = (Vector<Integer>) master_file.readObject();
+            master_file.close();
+
+            String committed = "./" + m_name + ".A";
+
+            if (master_rec.get(0) == 1)
+                committed = "./" + m_name + ".B";
             ObjectInputStream committed_file = new ObjectInputStream(new FileInputStream(committed));
             m_data = (RMHashMap) committed_file.readObject();
-            lm.setTables((Vector<TPHashTable>) committed_file.readObject());
-            tm.setRMTable((Hashtable<Integer, Vector<IResourceManager>>) committed_file.readObject());
+            local_copy = (HashMap<Integer, RMHashMap>) committed_file.readObject();
+            tm.updateRM("flight", flightRM);
+            tm.updateRM("car", carRM);
+            tm.updateRM("room", roomRM);
+            tm.setRMTable((Hashtable<Integer, Vector<String>>) committed_file.readObject());
+            committed_file.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {

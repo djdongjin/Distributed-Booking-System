@@ -10,12 +10,14 @@ import Server.Common.LogItem;
 import Server.Interface.IResourceManager;
 
 public class TransactionManager {
-    private Hashtable<Integer, Vector<IResourceManager>> xid_rm;
+    private Hashtable<Integer, Vector<String>> xid_rm;
     private Hashtable<Integer, Long> xid_time;
     private static int num_transaction = 0;
     private static long MAX_EXIST_TIME = 100000;
     private static long MAX_VOTING_TIME = 80000;
     private String mid_name;
+
+    private Hashtable<String, IResourceManager> name_RM = new Hashtable<> ();
 
     // TODO: Crash mode 8 in Middleware recovery
     public ArrayList<Boolean> crash_middle = new ArrayList<>(9);
@@ -30,8 +32,9 @@ public class TransactionManager {
 
     public int start() {
         num_transaction++;
+        writeLog(new LogItem(num_transaction, "INIT"));
         synchronized (xid_rm) {
-            xid_rm.put(num_transaction, new Vector<IResourceManager>());
+            xid_rm.put(num_transaction, new Vector<String>());
         }
         synchronized (xid_time) {
             xid_time.put(num_transaction, System.currentTimeMillis());
@@ -39,12 +42,18 @@ public class TransactionManager {
         return num_transaction;
     }
 
-    public void addRM(int xid, IResourceManager rm) {
-        Vector<IResourceManager> tmp = xid_rm.get(xid);
-        if (!tmp.contains(rm)) {
-            tmp.add(rm);
+    public void addRM(int xid, IResourceManager rm) throws RemoteException {
+        String nm = rm.getName();
+        updateRM(nm, rm);
+        Vector<String> tmp = xid_rm.get(xid);
+        if (!tmp.contains(nm)) {
+            tmp.add(nm);
             xid_rm.put(xid, tmp);
         }
+    }
+
+    public void updateRM(String name, IResourceManager rm) {
+        name_RM.put(name, rm);
     }
 
     public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
@@ -150,14 +159,14 @@ public class TransactionManager {
                         }
 
                         for (IResourceManager rm : vote.keySet())
-                            if (vote.get(rm) == 1)
+                            if (vote.get(rm) == 1) {
                                 rm.abort(xid);
-
-                        // Crash mode 6
-                        if (crash_middle.get(6)) {
-                            System.out.println("crash mode 6: crash after sending some but not all decisions");
-                            System.exit(1);
-                        }
+                                // Crash mode 6
+                                if (crash_middle.get(6)) {
+                                    System.out.println("crash mode 6: crash after sending some but not all decisions");
+                                    System.exit(1);
+                                }
+                            }
 
                         // Crash mode 7
                         if (crash_middle.get(7)) {
@@ -177,8 +186,8 @@ public class TransactionManager {
 
     public boolean commit(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
         try {
-            for (IResourceManager rm : xid_rm.get(xid)) {
-                rm.commit(xid);
+            for (String rm_name : xid_rm.get(xid)) {
+                name_RM.get(rm_name).commit(xid);
 
                 // Crash mode 6
                 if (crash_middle.get(6)) {
@@ -208,8 +217,8 @@ public class TransactionManager {
 
     public boolean abort(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
         try {
-            for (IResourceManager rm : xid_rm.get(xid)) {
-                rm.abort(xid);
+            for (String rm_name : xid_rm.get(xid)) {
+                name_RM.get(rm_name).abort(xid);
             }
             synchronized (xid_rm) {
                 xid_time.remove(xid);
@@ -221,6 +230,7 @@ public class TransactionManager {
         } catch (RemoteException e) {
             e.printStackTrace();
         }
+        writeLog(new LogItem(xid, "ABORT"));
         return true;
     }
 
@@ -232,11 +242,6 @@ public class TransactionManager {
     }
 
     public Set<Integer> activeTransaction() {
-        // for (Integer s: xid_time.keySet())
-        // {
-        // System.out.print(s);
-        // }
-        // System.out.println();
         return xid_time.keySet();
     }
 
@@ -254,26 +259,26 @@ public class TransactionManager {
         }
     }
 
-    public Hashtable<Integer, Vector<IResourceManager>> getRMTable() {
+    public Hashtable<Integer, Vector<String>> getRMTable() {
         return xid_rm;
     }
 
-    public void setRMTable(Hashtable<Integer, Vector<IResourceManager>> xidrm) {
+    public void setRMTable(Hashtable<Integer, Vector<String>> xidrm) {
         xid_rm = xidrm;
     }
 
-    public Hashtable<Integer, Long> getTimeTable() {
-        return xid_time;
-    }
-
-    public void setTimeTable(Hashtable<Integer, Long> xidtime) {
-        xid_time = xidtime;
-    }
+//    public Hashtable<Integer, Long> getTimeTable() {
+//        return xid_time;
+//    }
+//
+//    public void setTimeTable(Hashtable<Integer, Long> xidtime) {
+//        xid_time = xidtime;
+//    }
 
     public void writeLog(LogItem lg) {
         System.out.println(">>>LOG: <xid,info>:" + lg.xid + ", " + lg.info);
         try {
-            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(mid_name + ".log"));
+            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(mid_name + ".log", true));
             out.writeObject(lg);
             out.close();
         } catch (Exception e) {
