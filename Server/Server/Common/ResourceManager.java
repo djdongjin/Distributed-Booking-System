@@ -434,7 +434,7 @@ public class ResourceManager implements IResourceManager {
 	public boolean commit(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException
 	{
 		if (!xid_time.keySet().contains(id)) {
-			System.out.println("||| " + id + " has been cimmitted/aborted before!!");
+			System.out.println("||| " + id + " has been committed/aborted before!!");
 			return true;
 		}
 		// Crash mode 4
@@ -503,21 +503,43 @@ public class ResourceManager implements IResourceManager {
 	}
 
 	public boolean prepare(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
+
+	    Thread crash_after_answer = new Thread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        // Thread.sleep(10);
+                        System.out.println("test crash mode 3:" + System.currentTimeMillis());
+                        // System.exit(1);
+                    }
+                }
+        );
+
 		// Crash mode 1
 		if (crash_rm.get(1)) {
 			System.out.println("crash mode 1: crash after receiving vote request but before sending answer");
 			System.exit(1);
 		}
 		if (!xid_time.keySet().contains(xid)) {
+            abort(xid);
 			// Crash mode 2
 			if (crash_rm.get(2)) {
 				System.out.println("crash mode 2: crash after deciding which answer to send");
 				System.exit(1);
 			}
-			abort(xid);
 			System.out.println("Transaction [" + xid + "] has been aborted caused by VOTING NO!");
+
+			// Crash mode 3
+            if (crash_rm.get(3)) {
+                System.out.println("crash mode 3: crash after sending answer.");
+                crash_after_answer.run();
+            }
 			return false;
 		}
+
+        // TODO: shadowing, (write undo/redo information in log)
+        // Write a YES record in log
+        writeLog(new LogItem(xid, "YES"));
 
 		// Crash mode 2
 		if (crash_rm.get(2)) {
@@ -525,9 +547,11 @@ public class ResourceManager implements IResourceManager {
 			System.exit(1);
 		}
 
-		// TODO: shadowing, (write undo/redo information in log)
-		// Write a YES record in log
-		writeLog(new LogItem(xid, "YES"));
+        // Crash mode 3
+        if (crash_rm.get(3)) {
+            System.out.println("crash mode 3: crash after sending answer.");
+            crash_after_answer.run();
+        }
 		return true;
 	}
 

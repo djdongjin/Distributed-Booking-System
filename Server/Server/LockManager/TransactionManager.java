@@ -88,6 +88,7 @@ public class TransactionManager {
                                         public void run() {
                                             try {
                                                 int res = name_RM.get(rm).prepare(xid) ? 1 : 0;
+                                                System.out.println("Test::" + System.currentTimeMillis());
                                                 vote.put(rm, res);
                                             } catch (Exception e) {
                                                 System.out.println("One of RMs crashed, need to wait for the second voting round.");
