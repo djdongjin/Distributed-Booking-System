@@ -57,7 +57,7 @@ public class TransactionManager {
     }
 
     public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-        HashMap<IResourceManager, Integer> vote = new HashMap<>();
+        HashMap<String, Integer> vote = new HashMap<>();
         int num_rm = xid_rm.get(xid).size();
         int vote_loop = 0;
 
@@ -77,16 +77,17 @@ public class TransactionManager {
             while (true) {
                 if (System.currentTimeMillis() - begin_time > vote_loop * MAX_VOTING_TIME) {
                     if (vote_loop <= 1) {
+                        System.out.println("2PC: enter the " + vote_loop + " round voting.");
                         //revote
                         vote_loop++;
                         Thread vote_thread = new Thread(new Runnable() {
                             @Override
                             public void run() {
-                                for (IResourceManager rm : vote.keySet()) {
+                                for (String rm : xid_rm.get(xid)) {
                                     Thread rm_prepare = new Thread(new Runnable() {
                                         public void run() {
                                             try {
-                                                int res = rm.prepare(xid) ? 1 : 0;
+                                                int res = name_RM.get(rm).prepare(xid) ? 1 : 0;
                                                 vote.put(rm, res);
                                             } catch (Exception e) {
                                                 System.out.println("One of RMs crashed, need to wait for the second voting round.");
@@ -106,12 +107,13 @@ public class TransactionManager {
                         });
                         vote_thread.start();
                     } else {
+                        System.out.println("2PC: enter timeout period.");
                         // timeout
                         // vote_thread.interrupt();
                         writeLog(new LogItem(xid, "ABORT"));
-                        for (IResourceManager rm : vote.keySet())
+                        for (String rm : vote.keySet())
                             if (vote.get(rm) == 1) {
-                                rm.abort(xid);
+                                name_RM.get(rm).abort(xid);
                             }
                         synchronized (xid_rm) {
                             xid_time.remove(xid);
@@ -163,9 +165,9 @@ public class TransactionManager {
                             System.exit(1);
                         }
 
-                        for (IResourceManager rm : vote.keySet())
+                        for (String rm : vote.keySet())
                             if (vote.get(rm) == 1) {
-                                rm.abort(xid);
+                                name_RM.get(rm).abort(xid);
                                 // Crash mode 6
                                 if (crash_middle.get(6)) {
                                     System.out.println("crash mode 6: crash after sending some but not all decisions");

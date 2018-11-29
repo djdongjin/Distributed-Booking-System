@@ -498,6 +498,7 @@ public class RMIMiddleware extends ResourceManager {
 
     public void reconnectTest()
     {
+        boolean y1 = true, y2 = true, y3 = true;
         try {
             try {
                 flightRM.pingTest();
@@ -593,7 +594,7 @@ public class RMIMiddleware extends ResourceManager {
         for (String f: lst) {
             File file = new File(f);
             if (file.exists() && file.delete())
-                System.out.println("delelte file: " + f);
+                System.out.println("delete file: " + f);
         }
         System.exit(1);
     }
