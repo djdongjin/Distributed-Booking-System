@@ -717,6 +717,15 @@ public class RMIMiddleware extends ResourceManager {
     public void crashMiddleware(int mode) throws RemoteException
     {
         tm.crashMiddleware(mode);
+        if (mode == 8) {
+            try {
+                File file = new File(m_name + ".crash");
+                if (!file.exists())
+                    file.createNewFile();
+            } catch (Exception e) {
+
+            }
+        }
     }
 
     public void crashResourceManager(String name /* RM Name */, int mode) throws RemoteException
@@ -740,17 +749,14 @@ public class RMIMiddleware extends ResourceManager {
         }
         try {
             try {
-                ObjectInputStream crash_file = new ObjectInputStream(new FileInputStream(m_name + ".crash"));
-                ArrayList<Boolean> crash_tm = (ArrayList<Boolean>) crash_file.readObject();
-                crash_file.close();
                 File file = new File(m_name + ".crash");
-                file.delete();
-                if (crash_tm.get(8)) {
+                if (file.exists()) {
+                    file.delete();
                     // Crash mode 8
                     System.out.println("crash mode 8: crash during recovery.");
                     System.exit(1);
                 }
-            } catch (FileNotFoundException e) {
+            } catch (Exception e) {
                 System.out.println("Don't need to read crash mode from disk.");
             }
             recoverShadowing();
@@ -758,32 +764,37 @@ public class RMIMiddleware extends ResourceManager {
             ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
             LogItem it;
             int max_xid = 1;
-            while ((it = (LogItem) log_in.readObject()) != null) {
-                int xid = it.xid;
-                max_xid = max_xid > xid? max_xid:xid;
-                String info = it.info;
-                if (info.equals("INIT")) {
-                    xid_status.put(xid, CoordinateStatus.INIT);
-                } else if (info.equals("start-2PC")) {
-                    xid_status.put(xid, CoordinateStatus.START_2PC);
-                } else if (info.equals("COMMIT")) {
-                    if (xid_status.get(xid) == CoordinateStatus.ABORT)
-                        System.out.println("WRONG!!!! xid: "+xid+", old status: ABORT, new status: COMMIT!");
-                    xid_status.put(xid, CoordinateStatus.COMMIT);
-                } else if (info.equals("ABORT")) {
-                    if (xid_status.get(xid) == CoordinateStatus.COMMIT)
-                        System.out.println("WRONG!!!! xid: "+xid+", old status: COMMIT, new status: ABORT!");
-                    xid_status.put(xid, CoordinateStatus.ABORT);
+            try {
+                while ((it = (LogItem) log_in.readObject()) != null) {
+                    int xid = it.xid;
+                    max_xid = max_xid > xid ? max_xid : xid;
+                    String info = it.info;
+                    if (info.equals("INIT")) {
+                        xid_status.put(xid, CoordinateStatus.INIT);
+                    } else if (info.equals("start-2PC")) {
+                        xid_status.put(xid, CoordinateStatus.START_2PC);
+                    } else if (info.equals("COMMIT")) {
+                        if (xid_status.get(xid) == CoordinateStatus.ABORT)
+                            System.out.println("WRONG!!!! xid: " + xid + ", old status: ABORT, new status: COMMIT!");
+                        xid_status.put(xid, CoordinateStatus.COMMIT);
+                    } else if (info.equals("ABORT")) {
+                        if (xid_status.get(xid) == CoordinateStatus.COMMIT)
+                            System.out.println("WRONG!!!! xid: " + xid + ", old status: COMMIT, new status: ABORT!");
+                        xid_status.put(xid, CoordinateStatus.ABORT);
 //                } else if (info.equals("CRASH-in-RECOVER")) {
 //                    tm.crash_middle.set(8, true);
 //                    System.out.println("!!! Please check log info:" + xid + ", " + info);
 //                }
-                } else {
-                    System.out.println("!!! Please check log info:" + xid + ", " + info);
+                    } else {
+                        System.out.println("!!! Please check log info:" + xid + ", " + info);
+                    }
                 }
+            } catch (IOException e) {
+                System.out.println("Log read finished.");
+                log_in.close();
             }
-            log_in.close();
-            tm.updateTransactionCount(max_xid+1);
+            System.out.println(max_xid);
+            tm.updateTransactionCount(max_xid);
             for (Integer xid : xid_status.keySet()) {
                 switch (xid_status.get(xid)) {
                     case INIT: {
@@ -805,6 +816,7 @@ public class RMIMiddleware extends ResourceManager {
         } catch (FileNotFoundException e) {
             System.out.println("RESTART: Not found log file!");
         } catch (IOException e) {
+            e.printStackTrace();
             System.out.println("RESTART: IO Exception at " + m_name);
         } catch (ClassNotFoundException e) {
             System.out.println("RESTART: ClassNotFoundException at " + m_name);

@@ -2,6 +2,7 @@ package Server.LockManager;
 
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.*;
@@ -13,8 +14,8 @@ public class TransactionManager {
     private Hashtable<Integer, Vector<String>> xid_rm;
     private Hashtable<Integer, Long> xid_time;
     private static int num_transaction = 0;
-    private static long MAX_EXIST_TIME = 100000;
-    private static long MAX_VOTING_TIME = 80000;
+    private static long MAX_EXIST_TIME = 90000;
+    private static long MAX_VOTING_TIME = 30000;
     private String mid_name;
 
     private Hashtable<String, IResourceManager> name_RM = new Hashtable<> ();
@@ -303,12 +304,10 @@ public class TransactionManager {
 //    }
 
     public void updateTransactionCount(int new_count) {
-        TransactionManager.num_transaction = new_count;
+        num_transaction = new_count;
     }
 
     public void crashMiddleware(int mode) {
-       // if (mode == 8)
-       //     writeLog(new LogItem(-111, "CRASH-in-RECOVER"));
         crash_middle.set(mode, true);
     }
 }

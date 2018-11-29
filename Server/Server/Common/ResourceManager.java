@@ -39,7 +39,7 @@ public class ResourceManager implements IResourceManager {
 
 	// Reads a data item
 	protected RMItem readData(int xid, String key) {
-		if (!xid_time.containsKey(xid))
+		if (!xid_time.containsKey(xid) && !key.contains("cust"))
 			writeLog(new LogItem(xid, "INIT"));
 		xid_time.put(xid, System.currentTimeMillis());
 		xid_yn.put(xid, true);
@@ -63,7 +63,7 @@ public class ResourceManager implements IResourceManager {
 
 	// Writes a data item
 	protected void writeData(int xid, String key, RMItem value) {
-		if (!xid_time.containsKey(xid))
+		if (!xid_time.containsKey(xid) && !key.contains("cust"))
 			writeLog(new LogItem(xid, "INIT"));
 		xid_time.put(xid, System.currentTimeMillis());
 		xid_yn.put(xid, true);
@@ -80,7 +80,7 @@ public class ResourceManager implements IResourceManager {
 
 	// Remove the item out of storage
 	protected void removeData(int xid, String key) {
-		if (!xid_time.containsKey(xid))
+		if (!xid_time.containsKey(xid) && !key.contains("cust"))
 			writeLog(new LogItem(xid, "INIT"));
 		xid_time.put(xid, System.currentTimeMillis());
 		xid_yn.put(xid, true);
@@ -457,12 +457,13 @@ public class ResourceManager implements IResourceManager {
 				}
 			}
 			local_copy.remove(id);
-			xid_time.remove(id);
-			xid_yn.remove(id);
 		}
+		xid_time.remove(id);
+		xid_yn.remove(id);
 		// write COMMIT record in log
-		writeLog(new LogItem(id, "COMMIT"));
 		commitShadowing(id);
+		writeLog(new LogItem(id, "COMMIT"));
+
 		return true;
 	}
 
@@ -508,9 +509,12 @@ public class ResourceManager implements IResourceManager {
                 new Runnable() {
                     @Override
                     public void run() {
-                        // Thread.sleep(10);
-                        System.out.println("test crash mode 3:" + System.currentTimeMillis());
-                        // System.exit(1);
+                    	try {
+							Thread.sleep(10);
+							System.exit(1);
+						} catch (InterruptedException e) {
+							System.out.println("test crash mode 3:" + System.currentTimeMillis());
+						}
                     }
                 }
         );
@@ -648,7 +652,7 @@ public class ResourceManager implements IResourceManager {
 	}
 
 	public void resetCrashes() throws RemoteException {
-		for (int i = 1; i <= 6; i++)
+		for (int i = 1; i < 6; i++)
 			crash_rm.set(i, false);
 	}
 
@@ -657,15 +661,22 @@ public class ResourceManager implements IResourceManager {
 	}
 
 	public void crashResourceManager(String name /* RM Name */, int mode) throws RemoteException {
-//        if (mode == 5)
-//            writeLog(new LogItem(-111, "CRASH-in-RECOVER"));
 		crash_rm.set(mode, true);
+		if (mode == 5) {
+			try {
+				File file = new File(m_name + ".crash");
+				if (!file.exists())
+					file.createNewFile();
+			} catch (Exception e) {
+
+			}
+		}
 	}
 
 	public void restart()
 	{
-        File testted = new File(m_name + ".master");
-        if (testted.exists()) {
+        File tested = new File(m_name + ".master");
+        if (tested.exists()) {
             System.out.println("Found shadowing files, ready to recover program and data.");
         } else {
             System.out.println("Not found shadowing files, initialize program.");
@@ -673,41 +684,40 @@ public class ResourceManager implements IResourceManager {
         }
 		try {
             try {
-                File file = new File(m_name + ".crash");
-                if (file.exists()) {
-                    ObjectInputStream crash_file = new ObjectInputStream(new FileInputStream(file));
-                    ArrayList<Boolean> crash_rm = (ArrayList<Boolean>) crash_file.readObject();
-                    crash_file.close();
-                    file.delete();
-                    if (crash_rm.get(5)) {
-                        // Crash mode 5
-                        System.out.println("crash mode 5: crash during recovery.");
-                        System.exit(1);
-                    }
-                }
-            } catch (FileNotFoundException e) {
-                System.out.println("Don't need to read crash mode from disk.");
-            }
+				File file = new File(m_name + ".crash");
+				if (file.exists()) {
+					file.delete();
+					// Crash mode 5
+					System.out.println("crash mode 5: crash during recovery.");
+					System.exit(1);
+				}
+            } catch (Exception e) {
+				System.out.println("Don't need to read crash mode from disk.");
+			}
             recoverShadowing();
 			HashMap<Integer, ParticipantStatue> xid_status = new HashMap<>();
 			ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
 			LogItem it = null;
-			while ((it = (LogItem) log_in.readObject()) != null) {
-				int xid = it.xid;
-				String info = it.info;
-				if (info.equals("INIT")) {
-					xid_status.put(xid, ParticipantStatue.INIT);
-				} else if (info.equals("YES")) {
-					xid_status.put(xid, ParticipantStatue.YES);
-				} else if (info.equals("COMMIT")) {
-					xid_status.put(xid, ParticipantStatue.COMMIT);
-				} else if (info.equals("ABORT")) {
-					xid_status.put(xid, ParticipantStatue.ABORT);
-				} else {
-					System.out.println("!!! Please check log info:" + xid + ", " + info);
+			try {
+				while ((it = (LogItem) log_in.readObject()) != null) {
+					int xid = it.xid;
+					String info = it.info;
+					if (info.equals("INIT")) {
+						xid_status.put(xid, ParticipantStatue.INIT);
+					} else if (info.equals("YES")) {
+						xid_status.put(xid, ParticipantStatue.YES);
+					} else if (info.equals("COMMIT")) {
+						xid_status.put(xid, ParticipantStatue.COMMIT);
+					} else if (info.equals("ABORT")) {
+						xid_status.put(xid, ParticipantStatue.ABORT);
+					} else {
+						System.out.println("!!! Please check log info:" + xid + ", " + info);
+					}
 				}
+			} catch (IOException e) {
+				System.out.println("Log read finished.");
+				log_in.close();
 			}
-			log_in.close();
 			for (Integer xid : xid_status.keySet()) {
 				switch (xid_status.get(xid)) {
 					case INIT: {
@@ -726,6 +736,7 @@ public class ResourceManager implements IResourceManager {
 		} catch (FileNotFoundException e) {
 			System.out.println("RESTART: Not found log file!");
 		} catch (IOException e) {
+			e.printStackTrace();
 			System.out.println("RESTART: IO Exception at " + m_name);
 		} catch (ClassNotFoundException e) {
 			System.out.println("RESTART: ClassNotFoundException at " + m_name);
