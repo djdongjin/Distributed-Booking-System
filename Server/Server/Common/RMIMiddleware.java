@@ -563,7 +563,7 @@ public class RMIMiddleware extends ResourceManager {
     {
         if (!tm.transactionExist(xid))
         {
-            throw new InvalidTransactionException(xid, "transaction not exist.");
+            throw new InvalidTransactionException(xid, "transaction " + xid + " not exist.");
         }
         lm.UnlockAll(xid);
         synchronized (local_copy) {
@@ -686,6 +686,7 @@ public class RMIMiddleware extends ResourceManager {
 
             if (master_rec.get(0) == 1)
                 committed = "./" + m_name + ".B";
+
             ObjectInputStream committed_file = new ObjectInputStream(new FileInputStream(committed));
             m_data = (RMHashMap) committed_file.readObject();
             local_copy = (HashMap<Integer, RMHashMap>) committed_file.readObject();
@@ -762,47 +763,44 @@ public class RMIMiddleware extends ResourceManager {
             recoverShadowing();
             HashMap<Integer, CoordinateStatus> xid_status = new HashMap<>();
             ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
-            LogItem it;
+            Vector<LogItem> its = (Vector< LogItem>) log_in.readObject();
+            log_in.close();
             int max_xid = 1;
-            try {
-                while ((it = (LogItem) log_in.readObject()) != null) {
-                    int xid = it.xid;
-                    max_xid = max_xid > xid ? max_xid : xid;
-                    String info = it.info;
-                    if (info.equals("INIT")) {
-                        xid_status.put(xid, CoordinateStatus.INIT);
-                    } else if (info.equals("start-2PC")) {
-                        xid_status.put(xid, CoordinateStatus.START_2PC);
-                    } else if (info.equals("COMMIT")) {
-                        if (xid_status.get(xid) == CoordinateStatus.ABORT)
-                            System.out.println("WRONG!!!! xid: " + xid + ", old status: ABORT, new status: COMMIT!");
-                        xid_status.put(xid, CoordinateStatus.COMMIT);
-                    } else if (info.equals("ABORT")) {
-                        if (xid_status.get(xid) == CoordinateStatus.COMMIT)
-                            System.out.println("WRONG!!!! xid: " + xid + ", old status: COMMIT, new status: ABORT!");
-                        xid_status.put(xid, CoordinateStatus.ABORT);
+            for (LogItem it: its) {
+                int xid = it.xid;
+                max_xid = max_xid > xid ? max_xid : xid;
+                String info = it.info;
+                if (info.equals("INIT")) {
+                    xid_status.put(xid, CoordinateStatus.INIT);
+                } else if (info.equals("start-2PC")) {
+                    xid_status.put(xid, CoordinateStatus.START_2PC);
+                } else if (info.equals("COMMIT")) {
+                    if (xid_status.get(xid) == CoordinateStatus.ABORT)
+                        System.out.println("WRONG!!!! xid: " + xid + ", old status: ABORT, new status: COMMIT!");
+                    xid_status.put(xid, CoordinateStatus.COMMIT);
+                } else if (info.equals("ABORT")) {
+                    if (xid_status.get(xid) == CoordinateStatus.COMMIT)
+                        System.out.println("WRONG!!!! xid: " + xid + ", old status: COMMIT, new status: ABORT!");
+                    xid_status.put(xid, CoordinateStatus.ABORT);
 //                } else if (info.equals("CRASH-in-RECOVER")) {
 //                    tm.crash_middle.set(8, true);
 //                    System.out.println("!!! Please check log info:" + xid + ", " + info);
 //                }
-                    } else {
-                        System.out.println("!!! Please check log info:" + xid + ", " + info);
-                    }
+                } else {
+                    System.out.println("!!! Please check log info:" + xid + ", " + info);
                 }
-            } catch (IOException e) {
-                System.out.println("Log read finished.");
-                log_in.close();
             }
+            System.out.println("Log read finished.");
             System.out.println(max_xid);
             tm.updateTransactionCount(max_xid);
             for (Integer xid : xid_status.keySet()) {
                 switch (xid_status.get(xid)) {
                     case INIT: {
-                        abort(xid);
+                        tm.abort(xid);
                         break;
                     }
                     case START_2PC: {
-                        abort(xid);
+                        tm.abort(xid);
                         break;
                     }
                     case COMMIT:

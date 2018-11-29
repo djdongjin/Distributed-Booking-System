@@ -8,6 +8,7 @@ package Server.Common;
 import Server.Interface.*;
 import Server.LockManager.TransactionAbortedException;
 import Server.LockManager.InvalidTransactionException;
+import com.oracle.tools.packager.Log;
 
 import java.io.*;
 
@@ -577,8 +578,8 @@ public class ResourceManager implements IResourceManager {
             if (!master_f.exists() && master_f.createNewFile())
                 System.out.println("Create new master file: " + master);
 
-			ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working));
-			ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master));
+			ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working_f));
+			ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master_f));
 			working_file.writeObject(m_data);
 			working_file.writeObject(local_copy);
 			working_file.close();
@@ -628,8 +629,19 @@ public class ResourceManager implements IResourceManager {
 	public void writeLog(LogItem lg) {
 		System.out.println(">>>LOG: <xid,info>:" + lg.xid + ", " + lg.info);
 		try {
-			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(m_name + ".log", true));
-			out.writeObject(lg);
+			Vector<LogItem> logs = null;
+			File file = new File(m_name + ".log");
+			if (!file.exists()) {
+				file.createNewFile();
+				logs = new Vector<>();
+			} else {
+				ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
+				logs = (Vector<LogItem>) in.readObject();
+			}
+			logs.add(lg);
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(m_name + ".log"));
+			out.writeObject(logs);
+			out.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -697,27 +709,24 @@ public class ResourceManager implements IResourceManager {
             recoverShadowing();
 			HashMap<Integer, ParticipantStatue> xid_status = new HashMap<>();
 			ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
-			LogItem it = null;
-			try {
-				while ((it = (LogItem) log_in.readObject()) != null) {
-					int xid = it.xid;
-					String info = it.info;
-					if (info.equals("INIT")) {
-						xid_status.put(xid, ParticipantStatue.INIT);
-					} else if (info.equals("YES")) {
-						xid_status.put(xid, ParticipantStatue.YES);
-					} else if (info.equals("COMMIT")) {
-						xid_status.put(xid, ParticipantStatue.COMMIT);
-					} else if (info.equals("ABORT")) {
-						xid_status.put(xid, ParticipantStatue.ABORT);
-					} else {
-						System.out.println("!!! Please check log info:" + xid + ", " + info);
-					}
+			Vector<LogItem> its = (Vector< LogItem>) log_in.readObject();
+			log_in.close();
+			for(LogItem it: its) {
+				int xid = it.xid;
+				String info = it.info;
+				if (info.equals("INIT")) {
+					xid_status.put(xid, ParticipantStatue.INIT);
+				} else if (info.equals("YES")) {
+					xid_status.put(xid, ParticipantStatue.YES);
+				} else if (info.equals("COMMIT")) {
+					xid_status.put(xid, ParticipantStatue.COMMIT);
+				} else if (info.equals("ABORT")) {
+					xid_status.put(xid, ParticipantStatue.ABORT);
+				} else {
+					System.out.println("!!! Please check log info:" + xid + ", " + info);
 				}
-			} catch (IOException e) {
-				System.out.println("Log read finished.");
-				log_in.close();
 			}
+			System.out.println("Log read finished.");
 			for (Integer xid : xid_status.keySet()) {
 				switch (xid_status.get(xid)) {
 					case INIT: {

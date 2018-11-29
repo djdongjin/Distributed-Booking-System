@@ -1,8 +1,6 @@
 package Server.LockManager;
 
-import java.io.FileOutputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.*;
@@ -117,12 +115,12 @@ public class TransactionManager {
                             if (vote.get(rm) == 1) {
                                 name_RM.get(rm).abort(xid);
                             }
-                        synchronized (xid_rm) {
+                        synchronized (xid_time) {
                             xid_time.remove(xid);
                         }
-                        synchronized (xid_rm) {
-                            xid_rm.remove(xid);
-                        }
+//                        synchronized (xid_rm) {
+//                            // xid_rm.remove(xid);
+//                        }
                         return false;
                     }
                 }
@@ -159,7 +157,7 @@ public class TransactionManager {
                         return true;
                     } else {
                         // some votes NO
-                        writeLog(new LogItem(xid, "ABORT"));
+
 
                         // Crash mode 5
                         if (crash_middle.get(5)) {
@@ -181,6 +179,10 @@ public class TransactionManager {
                         if (crash_middle.get(7)) {
                             System.out.println("crash mode 7: crash after sending all decisions");
                             System.exit(1);
+                        }
+                        writeLog(new LogItem(xid, "ABORT"));
+                        synchronized (xid_time) {
+                            xid_time.remove(xid);
                         }
                         return false;
                     }
@@ -211,9 +213,9 @@ public class TransactionManager {
             }
 
             synchronized (xid_rm) {
-                xid_rm.remove(xid);
+                // xid_rm.remove(xid);
             }
-            synchronized (xid_rm) {
+            synchronized (xid_time) {
                 xid_time.remove(xid);
             }
             return true;
@@ -228,11 +230,11 @@ public class TransactionManager {
             for (String rm_name : xid_rm.get(xid)) {
                 name_RM.get(rm_name).abort(xid);
             }
-            synchronized (xid_rm) {
+            synchronized (xid_time) {
                 xid_time.remove(xid);
             }
             synchronized (xid_rm) {
-                xid_rm.remove(xid);
+                // xid_rm.remove(xid);
             }
             return true;
         } catch (RemoteException e) {
@@ -243,7 +245,7 @@ public class TransactionManager {
     }
 
     public boolean transactionExist(int xid) {
-        if (xid_rm.containsKey(xid))
+        if (xid_time.containsKey(xid))
             return true;
         else
             return false;
@@ -286,8 +288,18 @@ public class TransactionManager {
     public void writeLog(LogItem lg) {
         System.out.println(">>>LOG: <xid,info>:" + lg.xid + ", " + lg.info);
         try {
-            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(mid_name + ".log", true));
-            out.writeObject(lg);
+            Vector<LogItem> logs = null;
+            File file = new File(mid_name + ".log");
+            if (!file.exists()) {
+                file.createNewFile();
+                logs = new Vector<>();
+            } else {
+                ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
+                logs = (Vector<LogItem>) in.readObject();
+            }
+            logs.add(lg);
+            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(mid_name + ".log"));
+            out.writeObject(logs);
             out.close();
         } catch (Exception e) {
             e.printStackTrace();

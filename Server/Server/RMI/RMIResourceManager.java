@@ -57,6 +57,9 @@ public class RMIResourceManager extends ResourceManager
 			});
 			timeout_minitor.start();
 
+			// recover or new start
+			server.restart();
+
 			Runtime.getRuntime().addShutdownHook(new Thread() {
 				public void run() {
 					try {
