@@ -10,7 +10,7 @@ import Server.Interface.IResourceManager;
 
 public class TransactionManager {
     private Hashtable<Integer, Vector<String>> xid_rm;
-    private Hashtable<Integer, Long> xid_time;
+    public Hashtable<Integer, Long> xid_time;
     private static int num_transaction = 0;
     private static long MAX_EXIST_TIME = 90000;
     private static long MAX_VOTING_TIME = 30000;
@@ -56,7 +56,7 @@ public class TransactionManager {
     }
 
     public boolean twoPC(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-        HashMap<String, Integer> vote = new HashMap<>();
+        Hashtable<String, Integer> vote = new Hashtable<>();
         int num_rm = xid_rm.get(xid).size();
         int vote_loop = 0;
 
@@ -87,8 +87,10 @@ public class TransactionManager {
                                         public void run() {
                                             try {
                                                 int res = name_RM.get(rm).prepare(xid) ? 1 : 0;
-                                                System.out.println("Test::" + System.currentTimeMillis());
-                                                vote.put(rm, res);
+                                                // System.out.println("Test::" + System.currentTimeMillis());
+                                                synchronized (vote) {
+                                                    vote.put(rm, res);
+                                                }
                                             } catch (Exception e) {
                                                 System.out.println("One of RMs crashed, need to wait for the second voting round.");
                                             }
@@ -157,8 +159,7 @@ public class TransactionManager {
                         return true;
                     } else {
                         // some votes NO
-
-
+                        System.out.println(vote.toString());
                         // Crash mode 5
                         if (crash_middle.get(5)) {
                             System.out.println("crash mode 5: crash after deciding but before sending decision");
@@ -195,50 +196,49 @@ public class TransactionManager {
     }
 
     public boolean commit(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-        try {
-            for (String rm_name : xid_rm.get(xid)) {
+        for (String rm_name : xid_rm.get(xid)) {
+            try {
                 name_RM.get(rm_name).commit(xid);
-
-                // Crash mode 6
-                if (crash_middle.get(6)) {
-                    System.out.println("crash mode 6: crash after sending some but not all decisions");
-                    System.exit(1);
-                }
+            } catch (RemoteException e) {
+                System.out.println(">>>Some RM crashed and will enter indefinity waiting.");
             }
 
-            // Crash mode 7
-            if (crash_middle.get(7)) {
-                System.out.println("crash mode 7: crash after sending all decisions");
+            // Crash mode 6
+            if (crash_middle.get(6)) {
+                System.out.println("crash mode 6: crash after sending some but not all decisions");
                 System.exit(1);
             }
+        }
 
-            synchronized (xid_rm) {
-                // xid_rm.remove(xid);
-            }
-            synchronized (xid_time) {
-                xid_time.remove(xid);
-            }
-            return true;
-        } catch (RemoteException e) {
-            e.printStackTrace();
+        // Crash mode 7
+        if (crash_middle.get(7)) {
+            System.out.println("crash mode 7: crash after sending all decisions");
+            System.exit(1);
+        }
+
+//        synchronized (xid_rm) {
+//            // xid_rm.remove(xid);
+//        }
+        synchronized (xid_time) {
+            xid_time.remove(xid);
         }
         return true;
     }
 
     public boolean abort(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-        try {
-            for (String rm_name : xid_rm.get(xid)) {
+
+        for (String rm_name : xid_rm.get(xid)) {
+            try {
                 name_RM.get(rm_name).abort(xid);
+            } catch (RemoteException e) {
+                e.printStackTrace();
             }
-            synchronized (xid_time) {
-                xid_time.remove(xid);
-            }
-            synchronized (xid_rm) {
-                // xid_rm.remove(xid);
-            }
-            return true;
-        } catch (RemoteException e) {
-            e.printStackTrace();
+        }
+        synchronized (xid_time) {
+            xid_time.remove(xid);
+        }
+        synchronized (xid_rm) {
+            // xid_rm.remove(xid);
         }
         writeLog(new LogItem(xid, "ABORT"));
         return true;
@@ -291,14 +291,16 @@ public class TransactionManager {
             Vector<LogItem> logs = null;
             File file = new File(mid_name + ".log");
             if (!file.exists()) {
-                file.createNewFile();
                 logs = new Vector<>();
             } else {
                 ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
                 logs = (Vector<LogItem>) in.readObject();
+                in.close();
+                file.delete();
             }
             logs.add(lg);
-            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(mid_name + ".log"));
+            file.createNewFile();
+            ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file));
             out.writeObject(logs);
             out.close();
         } catch (Exception e) {

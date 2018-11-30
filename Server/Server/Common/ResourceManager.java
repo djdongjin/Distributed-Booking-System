@@ -470,7 +470,7 @@ public class ResourceManager implements IResourceManager {
 	public boolean abort(int id) throws RemoteException, TransactionAbortedException, InvalidTransactionException
 	{
 		if (!xid_time.keySet().contains(id)) {
-			System.out.println("||| " + id + " has been cimmitted/aborted before!!");
+			System.out.println("||| " + id + " has been committed/aborted before!!");
 			return true;
 		}
 		// Crash mode 4
@@ -510,7 +510,8 @@ public class ResourceManager implements IResourceManager {
                     @Override
                     public void run() {
                     	try {
-							Thread.sleep(10);
+							Thread.sleep(1);
+							System.out.println("crash mode 3: crash after sending answer.");
 							System.exit(1);
 						} catch (InterruptedException e) {
 							System.out.println("test crash mode 3:" + System.currentTimeMillis());
@@ -535,8 +536,7 @@ public class ResourceManager implements IResourceManager {
 
 			// Crash mode 3
             if (crash_rm.get(3)) {
-                System.out.println("crash mode 3: crash after sending answer.");
-                crash_after_answer.run();
+                crash_after_answer.start();
             }
 			return false;
 		}
@@ -553,8 +553,7 @@ public class ResourceManager implements IResourceManager {
 
         // Crash mode 3
         if (crash_rm.get(3)) {
-            System.out.println("crash mode 3: crash after sending answer.");
-            crash_after_answer.run();
+            crash_after_answer.start();
         }
 		return true;
 	}
@@ -718,8 +717,16 @@ public class ResourceManager implements IResourceManager {
 				} else if (info.equals("YES")) {
 					xid_status.put(xid, ParticipantStatue.YES);
 				} else if (info.equals("COMMIT")) {
+					if (xid_status.get(xid) == ParticipantStatue.ABORT) {
+						System.out.println("WRONG!!!! xid: " + xid + ", old status: ABORT, new status: COMMIT!");
+						continue;
+					}
 					xid_status.put(xid, ParticipantStatue.COMMIT);
 				} else if (info.equals("ABORT")) {
+					if (xid_status.get(xid) == ParticipantStatue.ABORT) {
+						System.out.println("WRONG!!!! xid: " + xid + ", old status: ABORT, new status: COMMIT!");
+						continue;
+					}
 					xid_status.put(xid, ParticipantStatue.ABORT);
 				} else {
 					System.out.println("!!! Please check log info:" + xid + ", " + info);

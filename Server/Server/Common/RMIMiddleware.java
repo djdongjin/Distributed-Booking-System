@@ -502,24 +502,30 @@ public class RMIMiddleware extends ResourceManager {
         try {
             try {
                 flightRM.pingTest();
+                y1 = true;
             } catch (RemoteException e) {
-                System.out.println("Flight resource manager crashed, re-connecting...");
+                if (y1)
+                    System.out.println("Flight resource manager crashed, re-connecting...");
+                y1 = false;
                 connectServer("flight", s_flightHost, s_flightPort, s_flightName);
-                System.out.println("Flight resource manager crashed, re-conneced...");
             }
             try {
                 carRM.pingTest();
+                y2 = true;
             } catch (RemoteException e) {
-                System.out.println("Car resource manager crashed, re-connecting...");
+                if (y2)
+                    System.out.println("Car resource manager crashed, re-connecting...");
+                y2 = false;
                 connectServer("car", s_carHost, s_carPort, s_carName);
-                System.out.println("Car resource manager crashed, re-conneced...");
             }
             try {
                 roomRM.pingTest();
+                y3 = false;
             } catch (RemoteException e) {
-                System.out.println("Room resource manager crashed, re-connecting...");
+                if (y3)
+                    System.out.println("Room resource manager crashed, re-connecting...");
+                y3 = false;
                 connectServer("room", s_roomHost, s_roomPort, s_roomName);
-                System.out.println("Room resource manager crashed, re-conneced...");
             }
             Thread.sleep(100);
         } catch (Exception e) {
@@ -590,7 +596,7 @@ public class RMIMiddleware extends ResourceManager {
             System.out.println("Car RM shut down successfully!");
         }
         System.out.println("Middleware shut down successfully!");
-        String [] lst = new String[]{m_name+".A", m_name+".B", m_name+".log", m_name+".master", m_name+".crash"};
+        String [] lst = new String[]{m_name + ".log2", m_name+".A", m_name+".B", m_name+".log", m_name+".master", m_name+".crash"};
         for (String f: lst) {
             File file = new File(f);
             if (file.exists() && file.delete())
@@ -605,6 +611,19 @@ public class RMIMiddleware extends ResourceManager {
         {
             throw new InvalidTransactionException(xid, "transaction not exist.");
         }
+        // write local copy and xid_rm
+        try {
+            File file = new File(m_name + ".log2");
+            if (file.exists())
+                file.delete();
+            file.createNewFile();
+            ObjectOutputStream log_in2 = new ObjectOutputStream(new FileOutputStream(file));
+            log_in2.writeObject(local_copy);
+            log_in2.writeObject(tm.getRMTable());
+        } catch (Exception e) {
+            System.out.println("Check twoPC of Middleware");
+        }
+
         // forward 2-pc to transactionManager
         boolean yn = tm.twoPC(xid);
         // all vote YES, then commit locally
@@ -626,6 +645,7 @@ public class RMIMiddleware extends ResourceManager {
                         }
                     }
                     local_copy.remove(xid);
+                    tm.xid_time.remove(xid);
                 }
             }
             commitShadowing(xid);
@@ -635,6 +655,7 @@ public class RMIMiddleware extends ResourceManager {
             lm.UnlockAll(xid);
             synchronized (local_copy) {
                 local_copy.remove(xid);
+                tm.xid_time.remove(xid);
             }
             return false;
         }
@@ -657,8 +678,6 @@ public class RMIMiddleware extends ResourceManager {
             ObjectOutputStream working_file = new ObjectOutputStream(new FileOutputStream(working_f));
             ObjectOutputStream master_file = new ObjectOutputStream(new FileOutputStream(master_f));
             working_file.writeObject(m_data);
-            working_file.writeObject(local_copy);
-            working_file.writeObject(tm.getRMTable());
             working_file.close();
             master_rec.set(0, 1 - master_rec.get(0));
             master_rec.set(1, xid);
@@ -677,7 +696,9 @@ public class RMIMiddleware extends ResourceManager {
     public boolean recoverShadowing() throws RemoteException, TransactionAbortedException, InvalidTransactionException
     {
         try {
-            String master = "./" + m_name + ".master";
+            File master = new File("./" + m_name + ".master");
+            if (!master.exists())
+                return true;
             ObjectInputStream master_file = new ObjectInputStream(new FileInputStream(master));
             master_rec = (Vector<Integer>) master_file.readObject();
             master_file.close();
@@ -689,11 +710,6 @@ public class RMIMiddleware extends ResourceManager {
 
             ObjectInputStream committed_file = new ObjectInputStream(new FileInputStream(committed));
             m_data = (RMHashMap) committed_file.readObject();
-            local_copy = (HashMap<Integer, RMHashMap>) committed_file.readObject();
-            tm.updateRM("flight", flightRM);
-            tm.updateRM("car", carRM);
-            tm.updateRM("room", roomRM);
-            tm.setRMTable((Hashtable<Integer, Vector<String>>) committed_file.readObject());
             committed_file.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -741,31 +757,43 @@ public class RMIMiddleware extends ResourceManager {
 
     public void restart()
     {
-        File tested = new File(m_name + ".master");
+        // need crash 8?
+        try {
+            File file = new File(m_name + ".crash");
+            if (file.exists()) {
+                file.delete();
+                // Crash mode 8
+                System.out.println("crash mode 8: crash during recovery.");
+                System.exit(1);
+            }
+        } catch (Exception e) {
+            // System.out.println("Don't need to read crash mode from disk.");
+        }
+
+        // crash or new start of program?
+        File tested = new File(m_name + ".log2");
         if (tested.exists()) {
             System.out.println("Found shadowing files, ready to recover program and data.");
         } else {
             System.out.println("Not found shadowing files, initialize program.");
             return;
         }
+        // crash recovery
         try {
-            try {
-                File file = new File(m_name + ".crash");
-                if (file.exists()) {
-                    file.delete();
-                    // Crash mode 8
-                    System.out.println("crash mode 8: crash during recovery.");
-                    System.exit(1);
-                }
-            } catch (Exception e) {
-                System.out.println("Don't need to read crash mode from disk.");
-            }
+            // read local copy and xid_rm
+            ObjectInputStream log2_in = new ObjectInputStream(new FileInputStream(m_name+".log2"));
+            local_copy = (HashMap<Integer, RMHashMap>) log2_in.readObject();
+            tm.setRMTable((Hashtable<Integer, Vector<String>>) log2_in.readObject());
+            log2_in.close();
+            // read m_data
             recoverShadowing();
-            HashMap<Integer, CoordinateStatus> xid_status = new HashMap<>();
+            // read log
             ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
             Vector<LogItem> its = (Vector< LogItem>) log_in.readObject();
             log_in.close();
+            // for loop log
             int max_xid = 1;
+            HashMap<Integer, CoordinateStatus> xid_status = new HashMap<>();
             for (LogItem it: its) {
                 int xid = it.xid;
                 max_xid = max_xid > xid ? max_xid : xid;
@@ -775,17 +803,17 @@ public class RMIMiddleware extends ResourceManager {
                 } else if (info.equals("start-2PC")) {
                     xid_status.put(xid, CoordinateStatus.START_2PC);
                 } else if (info.equals("COMMIT")) {
-                    if (xid_status.get(xid) == CoordinateStatus.ABORT)
+                    if (xid_status.get(xid) == CoordinateStatus.ABORT) {
                         System.out.println("WRONG!!!! xid: " + xid + ", old status: ABORT, new status: COMMIT!");
+                        continue;
+                    }
                     xid_status.put(xid, CoordinateStatus.COMMIT);
                 } else if (info.equals("ABORT")) {
-                    if (xid_status.get(xid) == CoordinateStatus.COMMIT)
+                    if (xid_status.get(xid) == CoordinateStatus.COMMIT) {
                         System.out.println("WRONG!!!! xid: " + xid + ", old status: COMMIT, new status: ABORT!");
+                        continue;
+                    }
                     xid_status.put(xid, CoordinateStatus.ABORT);
-//                } else if (info.equals("CRASH-in-RECOVER")) {
-//                    tm.crash_middle.set(8, true);
-//                    System.out.println("!!! Please check log info:" + xid + ", " + info);
-//                }
                 } else {
                     System.out.println("!!! Please check log info:" + xid + ", " + info);
                 }
@@ -795,20 +823,36 @@ public class RMIMiddleware extends ResourceManager {
             tm.updateTransactionCount(max_xid);
             for (Integer xid : xid_status.keySet()) {
                 switch (xid_status.get(xid)) {
-                    case INIT: {
-                        tm.abort(xid);
-                        break;
-                    }
-                    case START_2PC: {
-                        tm.abort(xid);
-                        break;
-                    }
-                    case COMMIT:
+                    case INIT:      { tm.abort(xid);    break;}
+                    case START_2PC: { tm.abort(xid);    break;}
+                    case COMMIT:    {
+                        synchronized (local_copy) {
+                            RMHashMap data = local_copy.get(xid);
+                            if (data != null) {
+                                System.out.println(xid + " is re-committed!");
+                                for (String key : data.keySet()) {
+                                    if (data.get(key) == null) {
+                                        synchronized (m_data) {
+                                            m_data.remove(key);
+                                        }
+                                    } else {
+                                        synchronized (m_data) {
+                                            m_data.put(key, data.get(key));
+                                        }
+                                    }
+                                }
+                                local_copy.remove(xid);
+                            }
+                        }
+                        commitShadowing(xid);
                         tm.commit(xid);
-                        break;
-                    case ABORT:
+                        break;}
+                    case ABORT:     {
+                        synchronized (local_copy) {
+                            local_copy.remove(xid);
+                        }
                         tm.abort(xid);
-                        break;
+                        break;}
                 }
             }
         } catch (FileNotFoundException e) {
