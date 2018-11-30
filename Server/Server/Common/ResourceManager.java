@@ -8,7 +8,6 @@ package Server.Common;
 import Server.Interface.*;
 import Server.LockManager.TransactionAbortedException;
 import Server.LockManager.InvalidTransactionException;
-import com.oracle.tools.packager.Log;
 
 import java.io.*;
 
