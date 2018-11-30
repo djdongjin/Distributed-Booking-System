@@ -155,12 +155,15 @@ public class RMIMiddleware extends ResourceManager {
                     Registry registry = LocateRegistry.getRegistry(server, port);
                     if (tp.equals("flight")) {
                         flightRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
+                        flightRM.pingTest();
                         tm.updateRM("flight", flightRM);
                     } else if (tp.equals("car")) {
                         carRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
+                        carRM.pingTest();
                         tm.updateRM("car", carRM);
                     } else if (tp.equals("room")) {
                         roomRM = (IResourceManager) registry.lookup(s_rmiPrefix + name);
+                        roomRM.pingTest();
                         tm.updateRM("room", roomRM);
                     } else {
                         System.err.println((char)27 + "[Please specify four ResourceManagers, or use default values.");
