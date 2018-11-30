@@ -16,6 +16,7 @@ import java.rmi.RemoteException;
 
 public class ResourceManager implements IResourceManager {
 
+	private boolean enter_crash = false;
 	protected Vector<Integer> master_rec = new Vector<>();
 	protected String m_name = "";
 	protected RMHashMap m_data = new RMHashMap();
@@ -437,9 +438,13 @@ public class ResourceManager implements IResourceManager {
 			System.out.println("||| " + id + " has been committed/aborted before!!");
 			return true;
 		}
+		if (crash_rm.get(3)) {
+			System.out.println("crash mode 3: crash after sending answer.");
+			System.exit(1);
+		}
 		// Crash mode 4
-		if (crash_rm.get(4)) {
-			System.out.println("crash mode 4: crash after receiving decision but before committing");
+		if (crash_rm.get(4) ) {
+			System.out.println("crash mode 4: crash after receiving decision but before aborting");
 			System.exit(1);
 		}
 
@@ -464,6 +469,7 @@ public class ResourceManager implements IResourceManager {
 		commitShadowing(id);
 		writeLog(new LogItem(id, "COMMIT"));
 
+		enter_crash = false;
 		return true;
 	}
 
@@ -471,10 +477,15 @@ public class ResourceManager implements IResourceManager {
 	{
 		if (!xid_time.keySet().contains(id)) {
 			System.out.println("||| " + id + " has been committed/aborted before!!");
+			enter_crash = false;
 			return true;
 		}
+		if (enter_crash && crash_rm.get(3)) {
+			System.out.println("crash mode 3: crash after sending answer.");
+			System.exit(1);
+		}
 		// Crash mode 4
-		if (crash_rm.get(4)) {
+		if (enter_crash && crash_rm.get(4) ) {
 			System.out.println("crash mode 4: crash after receiving decision but before aborting");
 			System.exit(1);
 		}
@@ -484,6 +495,8 @@ public class ResourceManager implements IResourceManager {
 		xid_yn.remove(id);
 		// write ABORT record in log
 		writeLog(new LogItem(id, "ABORT"));
+
+		enter_crash = false;
 		return true;
 	}
 
@@ -504,7 +517,7 @@ public class ResourceManager implements IResourceManager {
 	}
 
 	public boolean prepare(int xid) throws RemoteException, TransactionAbortedException, InvalidTransactionException {
-
+		enter_crash = true;
 	    Thread crash_after_answer = new Thread(
                 new Runnable() {
                     @Override
@@ -536,7 +549,7 @@ public class ResourceManager implements IResourceManager {
 
 			// Crash mode 3
             if (crash_rm.get(3)) {
-                crash_after_answer.start();
+                // crash_after_answer.start();
             }
 			return false;
 		}
@@ -553,7 +566,7 @@ public class ResourceManager implements IResourceManager {
 
         // Crash mode 3
         if (crash_rm.get(3)) {
-            crash_after_answer.start();
+            // crash_after_answer.start();
         }
 		return true;
 	}
@@ -630,13 +643,15 @@ public class ResourceManager implements IResourceManager {
 			Vector<LogItem> logs = null;
 			File file = new File(m_name + ".log");
 			if (!file.exists()) {
-				file.createNewFile();
 				logs = new Vector<>();
 			} else {
 				ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
 				logs = (Vector<LogItem>) in.readObject();
+				in.close();
+				file.delete();
 			}
 			logs.add(lg);
+			file.createNewFile();
 			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(m_name + ".log"));
 			out.writeObject(logs);
 			out.close();
