@@ -685,6 +685,18 @@ public class ResourceManager implements IResourceManager {
 
 	public void restart()
 	{
+		try {
+			File file = new File(m_name + ".crash");
+			if (file.exists()) {
+				file.delete();
+				// Crash mode 5
+				System.out.println("crash mode 5: crash during recovery.");
+				System.exit(1);
+			}
+		} catch (Exception e) {
+			System.out.println("Don't need to read crash mode from disk.");
+		}
+
         File tested = new File(m_name + ".master");
         if (tested.exists()) {
             System.out.println("Found shadowing files, ready to recover program and data.");
@@ -693,17 +705,6 @@ public class ResourceManager implements IResourceManager {
             return;
         }
 		try {
-            try {
-				File file = new File(m_name + ".crash");
-				if (file.exists()) {
-					file.delete();
-					// Crash mode 5
-					System.out.println("crash mode 5: crash during recovery.");
-					System.exit(1);
-				}
-            } catch (Exception e) {
-				System.out.println("Don't need to read crash mode from disk.");
-			}
             recoverShadowing();
 			HashMap<Integer, ParticipantStatue> xid_status = new HashMap<>();
 			ObjectInputStream log_in = new ObjectInputStream(new FileInputStream(m_name + ".log"));
