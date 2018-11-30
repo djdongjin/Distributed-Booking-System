@@ -24,3 +24,8 @@ hs_err_pid*
 
 *.idea/*
 .DS_store
+
+*.A
+*.B
+*.master
+*.log*
